@@ -1,40 +1,53 @@
 @echo off
 setlocal enabledelayedexpansion
+title Push to GitHub - Cardiac Monitor Pro
 
 echo ========================================================
-echo   PUSH CARDIAC MONITOR PRO TO GITHUB
+echo   CARDIAC MONITOR PRO - GITHUB REPOSITORY PUSH
 echo ========================================================
 echo.
 
 cd /d "%~dp0"
 
-REM Add MinGit to PATH if not already present
-set "PATH=%LOCALAPPDATA%\Programs\MinGit\cmd;%PATH%"
+REM Ensure Git and GitHub CLI are in PATH
+set "PATH=%LOCALAPPDATA%\Programs\MinGit\cmd;%LOCALAPPDATA%\Programs\gh;%PATH%"
 
-echo Remote: https://github.com/mohamednizamudeen02-web/Cardiac-Abnormality-Detection.git
-echo Branch: main
+echo Checking GitHub connection...
+gh auth status >nul 2>&1
+if %errorlevel% neq 0 (
+    echo.
+    echo [INFO] You are not logged in to GitHub yet.
+    echo Launching quick GitHub browser login...
+    echo.
+    gh auth login --web -h github.com -p https -w
+    if !errorlevel! neq 0 (
+        echo.
+        echo [INFO] Web login skipped or cancelled. Proceeding with standard push...
+    )
+)
+
 echo.
-echo Pushing commits to GitHub...
-echo (If prompted for password, enter your GitHub Personal Access Token)
+echo Pushing commits to branch 'main'...
+echo Target: https://github.com/mohamednizamudeen02-web/Cardiac-Abnormality-Detection.git
 echo.
 
 git push -u origin main
 
-if !errorlevel! equ 0 (
+if %errorlevel% equ 0 (
     echo.
     echo ========================================================
-    echo   [SUCCESS] Successfully pushed to GitHub!
+    echo   [SUCCESS] All files and models pushed to GitHub!
+    echo   URL: https://github.com/mohamednizamudeen02-web/Cardiac-Abnormality-Detection
     echo ========================================================
 ) else (
     echo.
     echo ========================================================
-    echo   [NOTICE] If authentication failed, you can either:
-    echo   1. Use a GitHub Personal Access Token (PAT):
-    echo      Settings -> Developer settings -> Personal access tokens
-    echo   2. Or run:
-    echo      git push https://<YOUR_TOKEN>@github.com/mohamednizamudeen02-web/Cardiac-Abnormality-Detection.git main
+    echo   [NOTICE] If you need to authenticate using a Token:
+    echo   1. Generate token at: https://github.com/settings/tokens (select 'repo')
+    echo   2. Run: git push https://YOUR_TOKEN@github.com/mohamednizamudeen02-web/Cardiac-Abnormality-Detection.git main
     echo ========================================================
 )
 
 echo.
-pause
+echo Press any key to exit...
+pause >nul
