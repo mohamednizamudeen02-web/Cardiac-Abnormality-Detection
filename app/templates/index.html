@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cardiac Abnormality Detection System</title>
+    <meta name="description" content="AI-powered cardiac abnormality detection through cardiometric feature analysis">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header" style="text-align:center;">
+            <div class="header-content" style="display:flex;flex-direction:column;align-items:center;gap:.5rem;">
+                <!-- Brand Logo Box (matches dashboard) -->
+                <div style="width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,rgba(0,119,255,.15),rgba(0,212,255,.08));border:2px solid rgba(0,212,255,.35);display:flex;align-items:center;justify-content:center;box-shadow:0 0 24px rgba(0,212,255,.25);">
+                    <svg width="34" height="20" viewBox="0 0 52 20" fill="none" stroke="#00d4ff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <polyline points="0,10 8,10 12,2 17,18 22,4 27,16 31,10 38,10 42,7 46,13 52,10"/>
+                    </svg>
+                </div>
+                <div class="brand-text" style="display:flex;align-items:center;gap:.75rem;">
+                    <h1 style="margin:0;font-family:'Outfit',sans-serif;font-size:1.8rem;font-weight:900;letter-spacing:-.3px;line-height:1;">
+                        <span style="color:#0033aa;">CARDIO</span><span style="color:#00a2ff;">METRIC</span>
+                    </h1>
+                    <div style="height:22px;width:2px;background:rgba(0,162,255,0.3);border-radius:2px;"></div>
+                    <span style="font-size:.82rem;font-weight:700;color:#00a2ff;letter-spacing:1px;text-transform:uppercase;font-family:'Inter',sans-serif;line-height:1;opacity:.9;">ADVANCED ECG ANALYSIS</span>
+                </div>
+                <p class="subtitle" style="margin-top:1rem;">Intelligent identification through cardiometric feature analysis</p>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Upload Section -->
+            <section class="upload-section card">
+                <h2>Upload ECG Data</h2>
+                <div class="upload-area" id="uploadArea">
+                    <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    <p class="upload-text">Drop ECG file here or click to browse</p>
+                    <p class="upload-hint">Supports CSV, TXT, or JSON formats</p>
+                    <input type="file" id="fileInput" accept=".csv,.txt,.json" hidden>
+                </div>
+
+                <!-- Manual Input Option -->
+                <div class="manual-input">
+                    <button class="btn-secondary" id="generateSampleBtn">Generate Sample ECG</button>
+                    <button class="btn-secondary" id="manualInputBtn">Manual Input</button>
+                </div>
+            </section>
+
+            <!-- ECG Visualization -->
+            <section class="visualization-section card" id="visualizationSection" style="display: none;">
+                <h2>ECG Signal</h2>
+                <div id="ecgPlot" class="plot-container"></div>
+                <button class="btn-primary" id="analyzeBtn">
+                    <span class="btn-text">Analyze ECG</span>
+                    <span class="btn-loader" style="display: none;">
+                        <span class="spinner"></span>
+                        Analyzing...
+                    </span>
+                </button>
+            </section>
+
+            <!-- Results Section -->
+            <section class="results-section" id="resultsSection" style="display: none;">
+                <!-- Prediction Card -->
+                <div class="card result-card">
+                    <h2>Diagnosis</h2>
+                    <div class="prediction-result" id="predictionResult">
+                        <div class="prediction-icon" id="predictionIcon"></div>
+                        <h3 class="prediction-label" id="predictionLabel">-</h3>
+                        <p class="prediction-confidence" id="predictionConfidence">-</p>
+                    </div>
+                </div>
+
+                <!-- Probabilities Card -->
+                <div class="card probabilities-card">
+                    <h2>Class Probabilities</h2>
+                    <div id="probabilitiesContainer" class="probabilities-container"></div>
+                </div>
+
+                <!-- Features Card -->
+                <div class="card features-card">
+                    <h2>Cardiometric Features</h2>
+                    <div id="featuresContainer" class="features-container"></div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer" role="contentinfo"
+            style="border-top: 1px solid rgba(0, 0, 0, 0.05); padding-top: 1.5rem; padding-bottom: 2rem; margin-top: 1rem; color: #6b7db3; font-size: 0.75rem; text-align: center;">
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 0.8rem; width: 100%;">
+                <div style="display: flex; gap: 1.5rem; justify-content: center;">
+                    <a href="#"
+                        onclick="var m=document.getElementById('privacyModal');if(m)m.style.display='flex';return false;"
+                        style="color: #6b7db3; text-decoration: none; transition: color 0.2s;">Privacy</a>
+                    <a href="#"
+                        onclick="var m=document.getElementById('termsModal');if(m)m.style.display='flex';return false;"
+                        style="color: #6b7db3; text-decoration: none; transition: color 0.2s;">Terms</a>
+                    <a href="#"
+                        onclick="var m=document.getElementById('disclaimerModal');if(m)m.style.display='flex';return false;"
+                        style="color: #6b7db3; text-decoration: none; transition: color 0.2s;">Clinical Disclaimer</a>
+                </div>
+                <div>
+                    <span style="font-weight: 600; color: #2a00ff;">Cardiac Monitor Pro</span> &copy; 2026. All rights
+                    reserved.
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+
+    <!-- ===== LEGAL MODALS ===== -->
+    <style>
+        .legal-modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 15, 30, 0.85);
+            backdrop-filter: blur(12px);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .legal-modal-overlay.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        .legal-modal-content {
+            background: #111827;
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            border-radius: 16px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+            padding: 2.5rem;
+            color: #f0f4ff;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+            transform: translateY(20px);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            text-align: left;
+        }
+
+        .legal-modal-overlay.active .legal-modal-content {
+            transform: translateY(0);
+        }
+
+        .legal-modal-close {
+            position: absolute;
+            top: 1.5rem;
+            right: 1.5rem;
+            background: rgba(255, 255, 255, 0.05);
+            border: none;
+            color: #a0c4e8;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .legal-modal-close:hover {
+            background: rgba(255, 71, 87, 0.2);
+            color: #ff4757;
+        }
+
+        .legal-modal-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            color: #00d4ff;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 1rem;
+        }
+
+        .legal-modal-body {
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: #b8c4e0;
+        }
+
+        .legal-modal-body h3 {
+            font-size: 1.1rem;
+            color: #f0f4ff;
+            margin: 1.5rem 0 0.5rem 0;
+        }
+
+        .legal-modal-body p {
+            margin-bottom: 1rem;
+        }
+    </style>
+
+    <div id="privacyModal" class="legal-modal-overlay" onclick="closeLegalModal(event, 'privacyModal')">
+        <div class="legal-modal-content">
+            <button class="legal-modal-close" onclick="closeLegalModal(event, 'privacyModal', true)">✕</button>
+            <h2 class="legal-modal-title">Privacy Policy</h2>
+            <div class="legal-modal-body">
+                <p>Last Updated: March 2026</p>
+                <p>Cardiac Monitor Pro is committed to protecting the privacy and security of your health information.
+                    This Privacy Policy details how we handle data collected through our platform.</p>
+                <h3>Data Collection</h3>
+                <p>We collect biometric data, including ECG readings, heart rate, and SpO2 levels, solely for the
+                    purpose of analysis by our machine learning models. We also store user account credentials and
+                    system settings.</p>
+                <h3>Data Security</h3>
+                <p>All data is transmitted via secure WebSocket connections and stored in encrypted databases. We employ
+                    industry-standard security measures to prevent unauthorized access.</p>
+                <h3>Data Usage</h3>
+                <p>Your data is used exclusively to provide the monitoring and analysis services of the platform. We do
+                    not sell, rent, or share your personal health information with third parties for marketing purposes.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div id="termsModal" class="legal-modal-overlay" onclick="closeLegalModal(event, 'termsModal')">
+        <div class="legal-modal-content">
+            <button class="legal-modal-close" onclick="closeLegalModal(event, 'termsModal', true)">✕</button>
+            <h2 class="legal-modal-title">Terms of Service</h2>
+            <div class="legal-modal-body">
+                <p>Last Updated: March 2026</p>
+                <p>Welcome to Cardiac Monitor Pro. By accessing or using our platform, you agree to be bound by these
+                    Terms of Service.</p>
+                <h3>Acceptable Use</h3>
+                <p>You agree to use the platform only for its intended purpose of analyzing and monitoring cardiac data.
+                    You must not attempt to disrupt the service, reverse engineer our algorithms, or upload malicious
+                    data.</p>
+                <h3>Account Responsibility</h3>
+                <p>You are responsible for maintaining the confidentiality of your account credentials and for all
+                    activities that occur under your account.</p>
+                <h3>Limitation of Liability</h3>
+                <p>Cardiac Monitor Pro is provided "as is" without warranty. We shall not be liable for any direct,
+                    indirect, incidental, or consequential damages resulting from the use or inability to use the
+                    service.</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="disclaimerModal" class="legal-modal-overlay" onclick="closeLegalModal(event, 'disclaimerModal')">
+        <div class="legal-modal-content">
+            <button class="legal-modal-close" onclick="closeLegalModal(event, 'disclaimerModal', true)">✕</button>
+            <h2 class="legal-modal-title" style="color: #ff4757;">Clinical Disclaimer</h2>
+            <div class="legal-modal-body">
+                <p><strong>IMPORTANT: NOT FOR CLINICAL DIAGNOSIS</strong></p>
+                <p>Cardiac Monitor Pro is an advanced machine learning and data visualization platform designed strictly
+                    for <strong>research, educational, and demonstrative purposes only</strong>.</p>
+                <h3>No Medical Advice</h3>
+                <p>The anomaly detections, risk scores, AI chat responses, and generated reports produced by this system
+                    do not constitute professional medical advice, diagnosis, or treatment.</p>
+                <h3>Algorithm Limitations</h3>
+                <p>While utilizing state-of-the-art Deep Learning models (including XGBoost, LightGBM, and Random Forest
+                    ensembles), artificial intelligence is not infallible and can produce false positives or false
+                    negatives.</p>
+                <p>Always seek the advice of a qualified physician or other qualified health provider with any questions
+                    you may have regarding a medical condition. Never disregard professional medical advice or delay in
+                    seeking it because of information provided by this specific application.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openLegalModal(modalId, event) {
+            event.preventDefault();
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                // Remove pointer-events none from CSS, rely on JS for display toggle
+                modal.style.display = 'flex';
+                // Small delay to allow display to apply before opacity transition starts
+                setTimeout(() => modal.classList.add('active'), 10);
+            }
+        }
+
+        function closeLegalModal(event, modalId, force = false) {
+            const modal = document.getElementById(modalId);
+            if (!modal) return;
+            // Close if force (X button clicked) OR if click was directly on the dark overlay (not the content box)
+            if (force || event.target === modal) {
+                modal.classList.remove('active');
+                // Wait for the opacity transition to finish before hiding the element
+                setTimeout(() => {
+                    modal.style.display = 'none';
+                }, 300);
+            }
+        }
+    </script>
+</body>
+
+</html>

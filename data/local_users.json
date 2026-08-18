@@ -1,0 +1,80 @@
+{
+    "admin": {
+        "password": "admin123",
+        "role": "Administrator",
+        "name": "Admin User",
+        "access_level": "admin"
+    },
+    "doctor": {
+        "password": "doctor123",
+        "role": "Cardiologist",
+        "name": "Dr. Smith",
+        "access_level": "admin"
+    },
+    "analyst": {
+        "password": "analyst123",
+        "role": "ECG Analyst",
+        "name": "Jane Analyst",
+        "access_level": "admin"
+    },
+    "viewer": {
+        "password": "viewer123",
+        "role": "Viewer",
+        "name": "View Only",
+        "access_level": "viewer"
+    },
+    "munthasir": {
+        "password": "new@123",
+        "role": "Cardiologist",
+        "name": "Dr. munthasir",
+        "access_level": "admin"
+    },
+    "ranjith": {
+        "password": "ranji@23",
+        "role": "Researcher",
+        "name": "ranjith R",
+        "access_level": "viewer"
+    },
+    "qqq": {
+        "password": "qqq123",
+        "role": "Researcher",
+        "name": "qq qq",
+        "access_level": "viewer"
+    },
+    "none": {
+        "password": "none123",
+        "role": "Cardiologist",
+        "name": "Dr. one",
+        "access_level": "admin"
+    },
+    "mohamed": {
+        "password": "noone123",
+        "role": "Doctor",
+        "name": "Dr. munthasir",
+        "access_level": "admin"
+    },
+    "blast": {
+        "password": "blast123",
+        "role": "Medical Staff",
+        "name": "first last",
+        "access_level": "admin"
+    },
+    "old": {
+        "password": "hii123",
+        "role": "Viewer",
+        "name": "old new",
+        "access_level": "viewer"
+    },
+    "hbye": {
+        "password": "hbye123",
+        "role": "Medical Staff",
+        "name": "hi bye",
+        "access_level": "admin"
+    },
+    "nothing": {
+        "password": "nthg123",
+        "role": "Administrator",
+        "name": "first thing",
+        "access_level": "admin"
+    }
+}

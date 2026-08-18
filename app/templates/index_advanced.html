@@ -1,0 +1,2709 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#06091a">
+    <title>CardiMetric AI — Intelligent Cardiac Analysis</title>
+    <meta name="description"
+        content="AI-powered cardiac abnormality detection with explainable AI and patient history tracking.">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style_advanced.css') }}">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <!-- Markdown Parser -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        /* Inline overrides: spacing + new components */
+
+        /* Remove bottom whitespace */
+        .dashboard {
+            padding-bottom: .5rem;
+        }
+
+        .footer {
+            padding: .75rem 1.5rem;
+            margin-top: .5rem;
+        }
+
+        .card {
+            margin-bottom: 1rem;
+        }
+
+        /* Patient Selector Bar */
+        .patient-bar {
+            display: flex;
+            align-items: center;
+            gap: .75rem;
+            background: rgba(13, 17, 39, .85);
+            backdrop-filter: blur(18px);
+            border: 1.5px solid rgba(0, 212, 255, .18);
+            border-radius: 16px;
+            padding: .65rem 1.25rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .patient-bar label {
+            font-size: .75rem;
+            font-weight: 700;
+            color: var(--txt-3);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            white-space: nowrap;
+        }
+
+        .patient-select {
+            flex: 1;
+            min-width: 160px;
+            background: rgba(30, 38, 65, .9);
+            border: 1.5px solid rgba(0, 212, 255, .2);
+            border-radius: 10px;
+            color: var(--txt, #f0f4ff);
+            font-family: 'Inter', sans-serif;
+            font-size: .875rem;
+            font-weight: 600;
+            padding: .5rem .85rem;
+            cursor: pointer;
+            outline: none;
+            transition: border-color .25s, box-shadow .25s;
+        }
+
+        .patient-select:focus {
+            border-color: var(--primary, #00d4ff);
+            box-shadow: 0 0 0 3px rgba(0, 212, 255, .2);
+        }
+
+        .patient-select option {
+            background: #131829;
+        }
+
+        .patient-info-chip {
+            display: flex;
+            align-items: center;
+            gap: .55rem;
+            background: rgba(0, 212, 255, .07);
+            border: 1px solid rgba(0, 212, 255, .18);
+            border-radius: 10px;
+            padding: .4rem .85rem;
+            font-size: .75rem;
+        }
+
+        .patient-info-chip .pip-name {
+            font-weight: 700;
+            color: var(--txt, #f0f4ff);
+        }
+
+        .patient-info-chip .pip-meta {
+            color: var(--txt-3, #6b7db3);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .risk-pill {
+            padding: .28rem .75rem;
+            border-radius: 999px;
+            font-size: .68rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .8px;
+        }
+
+        .risk-pill--low {
+            background: rgba(38, 222, 129, .15);
+            color: #26de81;
+            border: 1px solid rgba(38, 222, 129, .35);
+        }
+
+        .risk-pill--medium {
+            background: rgba(255, 165, 0, .15);
+            color: #ffa500;
+            border: 1px solid rgba(255, 165, 0, .35);
+        }
+
+        .risk-pill--high {
+            background: rgba(255, 71, 87, .15);
+            color: #ff4757;
+            border: 1px solid rgba(255, 71, 87, .35);
+        }
+
+        /* Patient History Timeline */
+        .history-card {
+            display: none;
+        }
+
+        .timeline {
+            list-style: none;
+            position: relative;
+            padding: 0 0 0 1.25rem;
+            margin: 0;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: .45rem;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(180deg, rgba(0, 212, 255, .6), transparent);
+        }
+
+        .timeline-item {
+            position: relative;
+            padding: 0 0 1rem .9rem;
+            cursor: pointer;
+            transition: opacity .2s;
+        }
+
+        .timeline-item:last-child {
+            padding-bottom: 0;
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -.07rem;
+            top: .3rem;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            border: 2px solid var(--primary, #00d4ff);
+            background: rgba(0, 212, 255, .25);
+            transition: background .25s;
+        }
+
+        .timeline-item:hover::before {
+            background: var(--primary, #00d4ff);
+        }
+
+        .tl-date {
+            font-size: .68rem;
+            color: var(--txt-3, #6b7db3);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .tl-pred {
+            font-size: .82rem;
+            font-weight: 700;
+            color: var(--txt, #f0f4ff);
+            margin: .15rem 0;
+        }
+
+        .tl-meta {
+            font-size: .72rem;
+            color: var(--txt-2, #b8c4e0);
+        }
+
+        /* Risk Trend Chart (mini) */
+        .trend-plot {
+            height: 140px;
+        }
+
+        /* Disease Probability Bars (enhanced) */
+        .prob-row {
+            display: flex;
+            align-items: center;
+            gap: .65rem;
+            margin-bottom: .65rem;
+        }
+
+        .prob-label {
+            font-size: .75rem;
+            font-weight: 600;
+            color: var(--txt-2, #b8c4e0);
+            min-width: 115px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .prob-track {
+            flex: 1;
+            height: 8px;
+            background: rgba(255, 255, 255, .06);
+            border-radius: 99px;
+            overflow: hidden;
+        }
+
+        .prob-fill {
+            height: 100%;
+            border-radius: 99px;
+            transition: width .6s cubic-bezier(.34, 1.56, .64, 1);
+        }
+
+        .prob-fill--normal {
+            background: linear-gradient(90deg, #00d4ff, #00ffc8);
+        }
+
+        .prob-fill--arrhy {
+            background: linear-gradient(90deg, #ffa500, #ff6b35);
+        }
+
+        .prob-fill--mi {
+            background: linear-gradient(90deg, #ff4757, #c0392b);
+        }
+
+        .prob-fill--other {
+            background: linear-gradient(90deg, #a78bfa, #7c3aed);
+        }
+
+        .prob-pct {
+            font-size: .72rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--txt, #f0f4ff);
+            min-width: 38px;
+            text-align: right;
+        }
+
+        /* Compact Patient History Card */
+        .history-empty {
+            text-align: center;
+            color: var(--txt-3, #6b7db3);
+            font-size: .82rem;
+            padding: 1.5rem 0;
+        }
+
+        /* Risk Gauge */
+        .risk-gauge-wrap {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: .75rem 0;
+        }
+
+        .risk-gauge-label {
+            font-size: .82rem;
+            font-weight: 700;
+        }
+
+        .risk-gauge-bar {
+            flex: 1;
+            height: 12px;
+            border-radius: 99px;
+            background: linear-gradient(90deg, #26de81 0%, #ffa500 50%, #ff4757 100%);
+            position: relative;
+        }
+
+        .risk-gauge-needle {
+            position: absolute;
+            top: -4px;
+            width: 4px;
+            height: 20px;
+            background: #fff;
+            border-radius: 2px;
+            box-shadow: 0 0 8px rgba(255, 255, 255, .7);
+            transition: left .8s cubic-bezier(.34, 1.56, .64, 1);
+            transform: translateX(-50%);
+        }
+
+        /* Responsive grid fixes */
+        @media (max-width: 1100px) {
+            .content-grid {
+                grid-template-columns: 1fr !important;
+            }
+        }
+
+        @media (max-width: 700px) {
+            .stats-bar {
+                grid-template-columns: 1fr 1fr !important;
+                gap: .5rem !important;
+            }
+
+            .patient-bar {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .patient-bar .patient-select {
+                width: 100%;
+            }
+
+            .nav-actions {
+                gap: .35rem;
+                flex-wrap: wrap;
+            }
+
+            .user-chip .user-role {
+                display: none;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .nav-actions .nav-btn span:not(.status-dot) {
+                display: none;
+            }
+
+            .stats-bar {
+                grid-template-columns: 1fr 1fr !important;
+            }
+
+            .container {
+                padding: 0 .5rem !important;
+            }
+        }
+
+        /* Viewer Role Badge */
+        .role-badge--viewer {
+            display: inline-flex;
+            align-items: center;
+            gap: .3rem;
+            background: rgba(255, 165, 0, .15);
+            border: 1px solid rgba(255, 165, 0, .4);
+            color: #ffa500;
+            font-size: .62rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .8px;
+            padding: .2rem .55rem;
+            border-radius: 999px;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+
+<body data-role="{{ session.get('access_level', 'viewer') }}">
+
+    <!-- ===== TOP NAVIGATION ===== -->
+    <nav class="top-nav" role="navigation" aria-label="Main navigation">
+            <!-- Brand Logo Box -->
+            <div style="display:flex;align-items:center;gap:.75rem;">
+                <div style="width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,rgba(0,119,255,.25),rgba(0,212,255,.15));border:1.5px solid rgba(0,212,255,.35);display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 18px rgba(0,212,255,.2);">
+                    <svg width="26" height="16" viewBox="0 0 52 20" fill="none" stroke="#00d4ff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <polyline points="0,10 8,10 12,2 17,18 22,4 27,16 31,10 38,10 42,7 46,13 52,10"/>
+                    </svg>
+                </div>
+                <div style="display:flex;align-items:center;gap:.6rem;">
+                    <h1 style="margin:0;font-family:'Outfit',sans-serif;font-size:1.45rem;font-weight:900;letter-spacing:-.3px;line-height:1;">
+                        <span style="color:#ffffff;">CARDIO</span><span style="color:#00d4ff;">METRIC</span>
+                    </h1>
+                    <div style="height:18px;width:1.5px;background:rgba(0,212,255,0.3);border-radius:2px;"></div>
+                    <span style="font-size:.65rem;font-weight:700;color:rgba(0,212,255,.85);letter-spacing:1px;text-transform:uppercase;font-family:'Inter',sans-serif;line-height:1;margin-top:2px;">ADVANCED ECG ANALYSIS</span>
+                </div>
+            </div>
+
+        <div class="nav-actions">
+            <button class="nav-btn" id="realTimeBtn" aria-label="Real-Time Monitor">
+                <span class="status-dot" aria-hidden="true"></span>
+                <span>Live Monitor</span>
+            </button>
+            <button class="nav-btn" id="patientsBtn" aria-label="Patient Management">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    aria-hidden="true">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+                <span>Patients</span>
+            </button>
+            <button class="nav-btn" id="settingsBtn" aria-label="Settings">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    aria-hidden="true">
+                    <circle cx="12" cy="12" r="3" />
+                    <path
+                        d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M12 2v2m0 16v2m7.07-14.07l-1.41 1.41M4.93 19.07l1.41-1.41M2 12h2m16 0h2" />
+                </svg>
+                <span>Settings</span>
+            </button>
+            <div class="user-chip">
+                <span class="user-avatar" aria-hidden="true">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
+                    </svg>
+                </span>
+                <span class="user-name">{{ session.get('name', 'Guest') }}</span>
+                <span class="user-role">{{ session.get('role', '') }}</span>
+                {% if session.get('access_level') == 'viewer' %}
+                <span class="role-badge--viewer"> View Only</span>
+                {% endif %}
+            </div>
+            <a href="/logout" class="nav-btn nav-btn--logout" aria-label="Sign out">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    aria-hidden="true">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+                <span>Sign Out</span>
+            </a>
+            <button class="theme-toggle" id="themeToggle" aria-label="Toggle colour theme">
+                <svg class="icon-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" aria-hidden="true">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                </svg>
+                <svg class="icon-sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" style="display:none" aria-hidden="true">
+                    <circle cx="12" cy="12" r="5" />
+                    <line x1="12" y1="1" x2="12" y2="3" />
+                    <line x1="12" y1="21" x2="12" y2="23" />
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                    <line x1="1" y1="12" x2="3" y2="12" />
+                    <line x1="21" y1="12" x2="23" y2="12" />
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                </svg>
+            </button>
+        </div>
+    </nav>
+
+    <div class="particles" id="particlesContainer" aria-hidden="true"></div>
+
+    <div class="container">
+        <main class="dashboard" role="main">
+
+            <!-- ===== LIVE STATS BAR ===== -->
+            <div class="stats-bar" role="status" aria-live="polite" aria-label="Live cardiac metrics">
+                <div class="stat-card stat-card--heart">
+                    <div class="stat-icon" aria-hidden="true">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path
+                                d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                        </svg>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-label">Heart Rate</div>
+                        <div class="stat-value" id="liveHeartRate">-- bpm</div>
+                    </div>
+                </div>
+                <div class="stat-card stat-card--hrv">
+                    <div class="stat-icon" aria-hidden="true">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                        </svg>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-label">HRV (SDNN)</div>
+                        <div class="stat-value" id="liveHRV">-- ms</div>
+                    </div>
+                </div>
+                <div class="stat-card stat-card--status">
+                    <div class="stat-icon" aria-hidden="true">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                            <polyline points="22 4 12 14.01 9 11.01" />
+                        </svg>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-label">Diagnosis</div>
+                        <div class="stat-value" id="liveStatus">Waiting</div>
+                    </div>
+                </div>
+                <div class="stat-card stat-card--confidence">
+                    <div class="stat-icon" aria-hidden="true">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="12" y1="8" x2="12" y2="12" />
+                            <line x1="12" y1="16" x2="12.01" y2="16" />
+                        </svg>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-label">Confidence</div>
+                        <div class="stat-value" id="liveConfidence">--%</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== PATIENT SELECTOR BAR ===== -->
+            <div class="patient-bar" role="region" aria-label="Patient selection">
+                <label for="selectedPatient">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        aria-hidden="true" style="margin-right:.3rem;vertical-align:middle">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
+                    </svg>
+                    Patient
+                </label>
+                <select id="selectedPatient" class="patient-select" aria-label="Select patient">
+                    <option value="">Loading patients...</option>
+                </select>
+                <div class="patient-info-chip" id="patientInfoChip" style="display:none;">
+                    <span class="pip-name" id="chipName"> </span>
+                    <span class="pip-meta" id="chipMeta"> </span>
+                    <span class="risk-pill" id="chipRisk" style="display:none;"></span>
+                </div>
+                <button class="btn-primary btn--sm" id="viewHistoryBtn" style="display:none;"
+                    aria-label="View patient history">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        aria-hidden="true">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                    History
+                </button>
+            </div>
+
+            <!-- ===== ECG DATA INPUT (full-width) ===== -->
+            <section class="card upload-card" aria-labelledby="uploadHeading" style="margin-bottom:1rem;">
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;">
+                    <h2 id="uploadHeading" style="margin:0;display:flex;align-items:center;gap:.5rem;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" aria-hidden="true">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                        </svg>
+                        ECG Data Input
+                    </h2>
+                    <div class="action-buttons" style="margin:0;">
+                        <button class="btn-primary" id="generateSampleBtn" aria-label="Generate sample ECG">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" aria-hidden="true">
+                                <polygon
+                                    points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                            </svg>
+                            Generate Sample
+                        </button>
+                        <button class="btn-secondary" id="startStreamBtn" aria-label="Start real-time stream">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" aria-hidden="true">
+                                <polygon points="5 3 19 12 5 21 5 3" />
+                            </svg>
+                            Live Stream
+                        </button>
+                    </div>
+                </div>
+                <div class="upload-area" id="uploadArea" role="button" tabindex="0"
+                    aria-label="Drop ECG file here or click to browse"
+                    style="margin-top:.75rem;">
+                    <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        aria-hidden="true">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="17 8 12 3 7 8" />
+                        <line x1="12" y1="3" x2="12" y2="15" />
+                    </svg>
+                    <p class="upload-text">Drop ECG file here or <span class="upload-link">click to browse</span></p>
+                    <p class="upload-hint">Supports CSV, TXT, JSON &bull; Max 10 MB</p>
+                    <input type="file" id="fileInput" accept=".csv,.txt,.json" hidden
+                        aria-label="Select ECG file">
+                </div>
+            </section>
+
+            <!-- ===== ECG SIGNAL VISUALIZATION (full-width) ===== -->
+            <section class="card ecg-card" id="ecgSection" style="display:none;margin-bottom:1rem;" aria-labelledby="ecgHeading">
+                <div class="card-header">
+                    <h2 id="ecgHeading">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" aria-hidden="true">
+                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                        </svg>
+                        ECG Signal
+                    </h2>
+                    <div class="card-actions">
+                        <button class="icon-btn" id="zoomInBtn" aria-label="Zoom in" data-tooltip="Zoom In">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <circle cx="11" cy="11" r="8" />
+                                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                                <line x1="11" y1="8" x2="11" y2="14" />
+                                <line x1="8" y1="11" x2="14" y2="11" />
+                            </svg>
+                        </button>
+                        <button class="icon-btn" id="zoomOutBtn" aria-label="Zoom out" data-tooltip="Zoom Out">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <circle cx="11" cy="11" r="8" />
+                                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                                <line x1="8" y1="11" x2="14" y2="11" />
+                            </svg>
+                        </button>
+                        <button class="icon-btn" id="downloadECGBtn" aria-label="Download ECG"
+                            data-tooltip="Download">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                <polyline points="7 10 12 15 17 10" />
+                                <line x1="12" y1="15" x2="12" y2="3" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div id="ecgPlot" class="plot-container" role="img" aria-label="ECG signal plot"></div>
+                <button class="btn-primary btn-analyze" id="analyzeBtn" aria-live="polite">
+                    <span class="btn-text">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" aria-hidden="true">
+                            <path
+                                d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v11m0 0h10a2 2 0 0 0 2-2V9M9 14H5a2 2 0 0 1-2-2V9m0 0h18" />
+                        </svg>
+                        Analyze ECG
+                    </span>
+                    <span class="btn-loader" style="display:none;" aria-label="Analyzing...">
+                        <span class="spinner" aria-hidden="true"></span> Analyzing...
+                    </span>
+                </button>
+            </section>
+
+            <!-- ===== MAIN CONTENT GRID (results + history) ===== -->
+            <div class="content-grid">
+
+                <!-- LEFT COLUMN: Patient History Timeline -->
+                <div class="left-column">
+
+                    <section class="card history-card" id="historySection" aria-labelledby="historyHeading">
+                        <div class="card-header">
+                            <h2 id="historyHeading">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" aria-hidden="true">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <polyline points="12 6 12 12 16 14" />
+                                </svg>
+                                Patient History
+                            </h2>
+                            <span id="historyPatientTag"
+                                style="font-size:.72rem;color:var(--txt-3);font-family:'JetBrains Mono',monospace;"></span>
+                        </div>
+                        <!-- Risk trend mini chart -->
+                        <div id="trendPlot" class="trend-plot" role="img" aria-label="Risk trend chart"></div>
+                        <!-- Timeline list -->
+                        <ul class="timeline" id="historyTimeline" aria-label="Analysis history">
+                            <li class="history-empty">Select a patient to view history</li>
+                        </ul>
+                    </section>
+                </div>
+
+                <!-- RIGHT COLUMN -->
+                <div class="right-column">
+
+                    <!-- Diagnosis Results -->
+                    <section class="card results-card" id="resultsSection" style="display:none;"
+                        aria-labelledby="resultsHeading" aria-live="polite">
+                        <h2 id="resultsHeading">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" aria-hidden="true">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                                <polyline points="22 4 12 14.01 9 11.01" />
+                            </svg>
+                            Diagnosis
+                        </h2>
+                        <div class="prediction-main">
+                            <div class="prediction-icon" id="predictionIcon" aria-hidden="true"></div>
+                            <div class="prediction-details">
+                                <h3 class="prediction-label" id="predictionLabel">-</h3>
+                                <p class="prediction-confidence" id="predictionConfidence">-</p>
+                                <div class="risk-badge" id="riskBadge" role="status">-</div>
+                            </div>
+                        </div>
+
+                        <!-- Risk Gauge -->
+                        <div class="risk-gauge-wrap" aria-label="Risk gauge">
+                            <span class="risk-gauge-label" style="color:#26de81;font-size:.72rem;">Low</span>
+                            <div class="risk-gauge-bar">
+                                <div class="risk-gauge-needle" id="riskNeedle" style="left:15%;"></div>
+                            </div>
+                            <span class="risk-gauge-label" style="color:#ff4757;font-size:.72rem;">High</span>
+                        </div>
+
+                        <!-- Class Probabilities (enhanced bars) -->
+                        <div class="probabilities-section">
+                            <h3>Disease Probabilities</h3>
+                            <div id="probabilitiesContainer" role="list"></div>
+                        </div>
+
+                        <!-- Uncertainty -->
+                        <div class="uncertainty-section">
+                            <h3>Prediction Uncertainty</h3>
+                            <div class="uncertainty-bar" aria-label="Uncertainty level">
+                                <div class="uncertainty-fill" id="uncertaintyFill"></div>
+                            </div>
+                            <p class="uncertainty-text" id="uncertaintyText">-</p>
+                        </div>
+
+                        <div class="result-actions">
+                            <button class="btn-secondary" id="generateReportBtn">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" aria-hidden="true">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                    <polyline points="14 2 14 8 20 8" />
+                                </svg>
+                                PDF Report
+                            </button>
+                            <button class="btn-secondary" id="viewExplanationBtn">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" aria-hidden="true">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <line x1="12" y1="8" x2="12" y2="12" />
+                                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                                </svg>
+                                Explain AI
+                            </button>
+                        </div>
+                    </section>
+
+                    <!-- Explainable AI -->
+                    <section class="card xai-card" id="xaiSection" style="display:none;" aria-labelledby="xaiHeading">
+                        <h2 id="xaiHeading">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" aria-hidden="true">
+                                <circle cx="12" cy="12" r="10" />
+                                <line x1="12" y1="8" x2="12" y2="16" />
+                                <line x1="8" y1="12" x2="16" y2="12" />
+                            </svg>
+                            Explainable AI
+                        </h2>
+                        <div class="xai-subsection">
+                            <h3>Grad-CAM Heatmap</h3>
+                            <p class="xai-description">Regions most influencing the prediction</p>
+                            <div id="gradcamPlot" class="plot-container-small" role="img" aria-label="Grad-CAM heatmap">
+                            </div>
+                        </div>
+                        <div class="xai-subsection">
+                            <h3>Feature Importance (SHAP)</h3>
+                            <div id="shapContainer" class="shap-container" role="list"></div>
+                        </div>
+                        <div class="xai-subsection">
+                            <h3>Clinical Recommendations</h3>
+                            <ul id="recommendationsList" class="recommendations-list"></ul>
+                        </div>
+                    </section>
+
+                    <!-- Cardiometric Features -->
+                    <section class="card features-card" id="featuresSection" style="display:none;"
+                        aria-labelledby="featuresHeading">
+                        <h2 id="featuresHeading">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" aria-hidden="true">
+                                <line x1="18" y1="20" x2="18" y2="10" />
+                                <line x1="12" y1="20" x2="12" y2="4" />
+                                <line x1="6" y1="20" x2="6" y2="14" />
+                            </svg>
+                            Cardiometric Features
+                        </h2>
+                        <div id="featuresContainer" class="features-grid" role="list"></div>
+                    </section>
+                </div>
+            </div>
+            <!-- ===== PATIENT ECG TRACKER ===== -->
+            <section class="card" id="patientTrackerSection" style="margin-top:1rem;margin-bottom:1rem;" aria-labelledby="trackerHeading">
+                <style>
+                    .tracker-tabs { display:flex; gap:.5rem; margin-bottom:1rem; flex-wrap:wrap; }
+                    .tracker-tab-btn {
+                        padding:.45rem 1rem; border-radius:10px; font-size:.78rem; font-weight:700;
+                        background:rgba(255,255,255,.05); border:1.5px solid rgba(0,212,255,.15);
+                        color:#6b7db3; cursor:pointer; transition:all .2s; letter-spacing:.3px;
+                    }
+                    .tracker-tab-btn.active {
+                        background:rgba(0,212,255,.12); border-color:rgba(0,212,255,.45);
+                        color:#00d4ff; box-shadow:0 0 14px rgba(0,212,255,.12);
+                    }
+                    .tracker-tab-btn:hover:not(.active) { background:rgba(255,255,255,.08); color:#b8c4e0; }
+                    .tracker-tab-pane { display:none; }
+                    .tracker-tab-pane.active { display:block; }
+                    .ecg-records-table { width:100%; border-collapse:collapse; font-size:.8rem; }
+                    .ecg-records-table th {
+                        text-align:left; padding:.45rem .65rem; font-size:.68rem; font-weight:700;
+                        color:#6b7db3; text-transform:uppercase; letter-spacing:.7px;
+                        border-bottom:1px solid rgba(255,255,255,.06);
+                    }
+                    .ecg-records-table td { padding:.55rem .65rem; border-bottom:1px solid rgba(255,255,255,.04); vertical-align:middle; }
+                    .ecg-records-table tr:last-child td { border-bottom:none; }
+                    .ecg-records-table tr:hover td { background:rgba(0,212,255,.04); }
+                    .ecg-records-table tr { cursor:pointer; transition:background .15s; }
+                    .tracker-no-patient {
+                        text-align:center; padding:2rem 1rem; color:#6b7db3;
+                        font-size:.85rem; display:flex; flex-direction:column; align-items:center; gap:.5rem;
+                    }
+                    .tracker-no-patient svg { opacity:.4; }
+                    .tracker-summary-chips { display:flex; gap:.65rem; flex-wrap:wrap; margin-bottom:1rem; }
+                    .tracker-chip {
+                        background:rgba(0,212,255,.08); border:1px solid rgba(0,212,255,.2);
+                        border-radius:10px; padding:.4rem .85rem; font-size:.75rem; font-weight:600;
+                    }
+                    .tracker-chip span { color:#00d4ff; font-weight:800; margin-right:.3rem; }
+                    .live-track-box {
+                        background:rgba(0,212,255,.05); border:1.5px dashed rgba(0,212,255,.25);
+                        border-radius:12px; padding:1.25rem; text-align:center;
+                    }
+                    .live-track-box p { font-size:.82rem; color:#b8c4e0; margin:.5rem 0 1rem; }
+                    #trackerLiveStatus {
+                        display:inline-block; font-size:.72rem; font-weight:700; padding:.25rem .75rem;
+                        border-radius:999px; background:rgba(38,222,129,.12); color:#26de81;
+                        border:1px solid rgba(38,222,129,.3); display:none;
+                    }
+                    .upload-tracker-box {
+                        background:rgba(0,212,255,.04); border:1.5px dashed rgba(0,212,255,.2);
+                        border-radius:12px; padding:1.25rem; text-align:center; cursor:pointer;
+                        transition:border-color .25s, background .25s;
+                    }
+                    .upload-tracker-box:hover { border-color:rgba(0,212,255,.5); background:rgba(0,212,255,.08); }
+                    .upload-tracker-box p { font-size:.82rem; color:#b8c4e0; margin:.4rem 0; }
+                    .tracker-analyze-btn {
+                        margin-top:.75rem; display:none;
+                        padding:.5rem 1.25rem; border-radius:10px; font-size:.82rem; font-weight:700;
+                        background:linear-gradient(135deg,#0077ff,#00d4ff); color:#fff;
+                        border:none; cursor:pointer; transition:transform .15s, box-shadow .2s;
+                    }
+                    .tracker-analyze-btn:hover { transform:translateY(-1px); box-shadow:0 4px 16px rgba(0,212,255,.35); }
+                </style>
+                <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
+                    <h2 id="trackerHeading" style="display:flex;align-items:center;gap:.5rem;margin:0;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                        </svg>
+                        Patient ECG Tracker
+                        <span style="font-size:.65rem;font-weight:600;background:rgba(38,222,129,.15);color:#26de81;border:1px solid rgba(38,222,129,.3);border-radius:99px;padding:.15rem .55rem;">NEW</span>
+                    </h2>
+                    <span id="trackerPatientBadge" style="font-size:.72rem;color:#00d4ff;font-family:'JetBrains Mono',monospace;background:rgba(0,212,255,.07);border:1px solid rgba(0,212,255,.18);padding:.25rem .65rem;border-radius:8px;display:none;"></span>
+                </div>
+
+                <div class="tracker-tabs">
+                    <button class="tracker-tab-btn active" data-tab="records" id="trackerTabRecords">📂 Past Records</button>
+                    <button class="tracker-tab-btn" data-tab="live" id="trackerTabLive">📡 Live Tracking</button>
+                    <button class="tracker-tab-btn" data-tab="upload" id="trackerTabUpload">📤 Upload &amp; Analyze</button>
+                </div>
+
+                <!-- Tab: Past Records -->
+                <div class="tracker-tab-pane active" id="trackerPaneRecords">
+                    <div id="trackerSummaryChips" class="tracker-summary-chips" style="display:none;"></div>
+                    <div id="trackerTableWrap">
+                        <div class="tracker-no-patient">
+                            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <circle cx="12" cy="7" r="4"/><path d="M2 21v-2a7 7 0 0 1 14 0v2"/>
+                                <path d="M19 8l2 2-2 2"/><path d="M17 10h4"/>
+                            </svg>
+                            <span>Select a patient from the selector above to view their ECG session history.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: Live Tracking -->
+                <div class="tracker-tab-pane" id="trackerPaneLive">
+                    <div class="live-track-box">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="1.5">
+                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                        </svg>
+                        <p id="trackerLiveDesc">Select a patient and click <strong>Start Live Tracking</strong> to begin a continuous real-time ECG stream for that patient.</p>
+                        <span id="trackerLiveStatus">🟢 Streaming…</span>
+                        <div style="display:flex;gap:.65rem;justify-content:center;flex-wrap:wrap;margin-top:.75rem;">
+                            <button class="btn-primary btn--sm" id="trackerStartLiveBtn"
+                                style="display:inline-flex;align-items:center;gap:.4rem;">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                                Start Live Tracking
+                            </button>
+                            <button class="btn-secondary btn--sm" id="trackerStopLiveBtn" disabled
+                                style="display:inline-flex;align-items:center;gap:.4rem;">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12"/></svg>
+                                Stop
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: Upload & Analyze -->
+                <div class="tracker-tab-pane" id="trackerPaneUpload">
+                    <div class="upload-tracker-box" id="trackerUploadBox" role="button" tabindex="0">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="1.5">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="17 8 12 3 7 8"/>
+                            <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                        <p>Drop an ECG file here or <strong style="color:#00d4ff;">click to browse</strong></p>
+                        <p style="font-size:.72rem;color:#6b7db3;">Supports CSV, TXT, JSON — file will be analysed for the selected patient</p>
+                        <input type="file" id="trackerFileInput" accept=".csv,.txt,.json" hidden>
+                    </div>
+                    <div id="trackerUploadInfo" style="margin-top:.65rem;font-size:.78rem;color:#26de81;display:none;"></div>
+                    <button class="tracker-analyze-btn" id="trackerAnalyzeBtn">⚡ Analyze for Selected Patient</button>
+                </div>
+            </section>
+            <!-- ===== REAL-WORLD INTEGRATION PANELS ===== -->
+            <div style="margin-top:1rem;position:relative;z-index:10;">
+
+
+                <!-- VITAL SIGNS MONITOR -->
+                <section class="card" id="vitalsSection" style="margin-bottom:1rem;" aria-labelledby="vitalsHeading">
+                    <div class="card-header"
+                        style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
+                        <h2 id="vitalsHeading" style="display:flex;align-items:center;gap:.5rem;margin:0;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" aria-hidden="true">
+                                <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                            </svg>
+                            Vital Signs Monitor
+                            <span
+                                style="font-size:.65rem;font-weight:600;background:rgba(0,212,255,.15);color:#00d4ff;border:1px solid rgba(0,212,255,.3);border-radius:99px;padding:.15rem .55rem;">REAL-WORLD
+                                SYNC</span>
+                        </h2>
+                        <div style="display:flex;gap:.5rem;align-items:center;">
+                            <span id="ucrsScore"
+                                style="font-size:.75rem;font-weight:700;color:#00d4ff;font-family:'JetBrains Mono',monospace;">UCRS:
+                                --</span>
+                            <span id="fusedRiskBadge"
+                                style="font-size:.65rem;font-weight:800;padding:.2rem .6rem;border-radius:99px;background:rgba(255,255,255,.08);color:#b8c4e0;border:1px solid rgba(255,255,255,.12);">Fused
+                                Risk: --</span>
+                        </div>
+                    </div>
+
+                    <!-- Vitals Input Grid -->
+                    <div
+                        style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.75rem;padding:.25rem 0 .75rem;">
+                        <div class="vital-input-group">
+                            <label
+                                style="font-size:.68rem;font-weight:700;color:#00ffc8;text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:.3rem;">
+                                SpO2 (%)</label>
+                            <input type="number" id="inputSpo2" placeholder="98" min="50" max="100" step="0.1"
+                                style="width:100%;background:rgba(30,38,65,.9);border:1.5px solid rgba(0,212,255,.2);border-radius:10px;color:#f0f4ff;font-family:'Inter',sans-serif;font-size:.875rem;font-weight:600;padding:.5rem .85rem;outline:none;box-sizing:border-box;">
+                            <div id="spo2Status"
+                                style="font-size:.65rem;margin-top:.25rem;color:#26de81;height:.85rem;"></div>
+                        </div>
+                        <div class="vital-input-group">
+                            <label
+                                style="font-size:.68rem;font-weight:700;color:#ffa500;text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:.3rem;">
+                                Systolic BP (mmHg)</label>
+                            <input type="number" id="inputSystolic" placeholder="120" min="40" max="250"
+                                style="width:100%;background:rgba(30,38,65,.9);border:1.5px solid rgba(0,212,255,.2);border-radius:10px;color:#f0f4ff;font-family:'Inter',sans-serif;font-size:.875rem;font-weight:600;padding:.5rem .85rem;outline:none;box-sizing:border-box;">
+                            <div id="bpStatus" style="font-size:.65rem;margin-top:.25rem;color:#26de81;height:.85rem;">
+                            </div>
+                        </div>
+                        <div class="vital-input-group">
+                            <label
+                                style="font-size:.68rem;font-weight:700;color:#ffa500;text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:.3rem;">
+                                Diastolic BP (mmHg)</label>
+                            <input type="number" id="inputDiastolic" placeholder="80" min="20" max="200"
+                                style="width:100%;background:rgba(30,38,65,.9);border:1.5px solid rgba(0,212,255,.2);border-radius:10px;color:#f0f4ff;font-family:'Inter',sans-serif;font-size:.875rem;font-weight:600;padding:.5rem .85rem;outline:none;box-sizing:border-box;">
+                        </div>
+                        <div class="vital-input-group">
+                            <label
+                                style="font-size:.68rem;font-weight:700;color:#a78bfa;text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:.3rem;">
+                                Temperature (&deg;C)</label>
+                            <input type="number" id="inputTemperature" placeholder="36.7" min="28" max="45" step="0.1"
+                                style="width:100%;background:rgba(30,38,65,.9);border:1.5px solid rgba(0,212,255,.2);border-radius:10px;color:#f0f4ff;font-family:'Inter',sans-serif;font-size:.875rem;font-weight:600;padding:.5rem .85rem;outline:none;box-sizing:border-box;">
+                            <div id="tempStatus"
+                                style="font-size:.65rem;margin-top:.25rem;color:#26de81;height:.85rem;"></div>
+                        </div>
+                        <div class="vital-input-group">
+                            <label
+                                style="font-size:.68rem;font-weight:700;color:#ff4757;text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:.3rem;">
+                                Heart Rate (bpm)</label>
+                            <input type="number" id="inputHeartRate" placeholder="72" min="20" max="300"
+                                style="width:100%;background:rgba(30,38,65,.9);border:1.5px solid rgba(0,212,255,.2);border-radius:10px;color:#f0f4ff;font-family:'Inter',sans-serif;font-size:.875rem;font-weight:600;padding:.5rem .85rem;outline:none;box-sizing:border-box;">
+                        </div>
+                        <div style="display:flex;flex-direction:column;justify-content:flex-end;gap:.4rem;">
+                            <button id="submitVitalsBtn" class="btn-primary"
+                                style="font-size:.8rem;padding:.55rem .85rem;">
+                                Submit Vitals
+                            </button>
+                            <button id="clearVitalsBtn" class="btn-secondary"
+                                style="font-size:.75rem;padding:.4rem .7rem;">Clear</button>
+                        </div>
+                    </div>
+
+                    <!-- UCRS Commentary -->
+                    <div id="vitalsCommentary"
+                        style="display:none;background:rgba(0,212,255,.05);border:1px solid rgba(0,212,255,.15);border-radius:10px;padding:.75rem 1rem;margin-top:.25rem;">
+                        <div style="font-size:.72rem;font-weight:700;color:#00d4ff;margin-bottom:.4rem;">Clinical
+                            Commentary</div>
+                        <ul id="vitalsCommentaryList"
+                            style="margin:0;padding-left:1.1rem;font-size:.78rem;color:#b8c4e0;line-height:1.6;"></ul>
+                    </div>
+                </section>
+                <!-- MEDICAL REPORT ANALYZER -->
+                <section class="card" id="medicalReportSection" style="margin-bottom:1rem;" aria-labelledby="reportHeading">
+                    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
+                        <h2 id="reportHeading" style="display:flex;align-items:center;gap:.5rem;margin:0;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                                <polyline points="10 9 9 9 8 9"></polyline>
+                            </svg>
+                            Medical Report Analyzer
+                            <span style="font-size:.65rem;font-weight:600;background:rgba(167,139,250,.12);color:#a78bfa;border:1px solid rgba(167,139,250,.3);border-radius:99px;padding:.15rem .55rem;">GEMINI AI</span>
+                        </h2>
+                    </div>
+                    
+                    <div style="display:flex; flex-direction:column; gap:1rem;">
+                        <!-- Upload Box -->
+                        <div class="upload-area" id="reportUploadArea" role="button" tabindex="0" aria-label="Upload Medical Report" style="padding:1.5rem; text-align:center; border: 2px dashed rgba(0,212,255,.2); border-radius:12px; background:rgba(0,0,0,.15); transition:all 0.3s ease;">
+                            <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" width="32" height="32" style="margin-bottom:0.8rem; opacity:0.8;">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="17 8 12 3 7 8"></polyline>
+                                <line x1="12" y1="3" x2="12" y2="15"></line>
+                            </svg>
+                            <p style="color:#b8c4e0; font-weight:600; margin-bottom:.2rem;">Drag & drop a medical report here</p>
+                            <p style="color:#6b7db3; font-size:.75rem; margin-bottom:1rem;">Supported: PDF, JPG, PNG (Max 10MB)</p>
+                            <input type="file" id="reportFileInput" accept=".pdf,.jpg,.jpeg,.png" hidden>
+                            <button id="browseReportBtn" class="btn-secondary" style="font-size:.8rem;">Browse Files</button>
+                            <div id="reportFileName" style="margin-top:.8rem; font-size:.8rem; color:#00ffc8; font-weight:600; display:none;"></div>
+                        </div>
+
+                        <!-- Action Button -->
+                        <button id="analyzeReportBtn" class="btn-primary" style="width:100%; padding:.75rem; font-size:1rem; justify-content:center;" disabled>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:.5rem;">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
+                            </svg>
+                            <span id="analyzeReportBtnText">Analyze with Gemini</span>
+                            <span id="analyzeReportLoader" style="display:none; margin-left:.5rem;" class="spinner"></span>
+                        </button>
+
+                        <!-- Response Area -->
+                        <div id="reportResponseArea" style="display:none; background:rgba(18,22,45,0.7); border:1px solid rgba(167,139,250,.3); border-radius:12px; padding:1.25rem;">
+                            <div style="font-size:.75rem; font-weight:800; color:#a78bfa; text-transform:uppercase; letter-spacing:1px; margin-bottom:1rem; border-bottom:1px solid rgba(167,139,250,.2); padding-bottom:.5rem;">AI Analysis Results</div>
+                            <div id="reportMarkdownContent" style="color:#dbe4ff; font-size:.9rem; line-height:1.6; overflow-x:hidden;"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- IOT DEVICE HUB -->
+                <section class="card" id="iotSection" style="margin-bottom:1rem;" aria-labelledby="iotHeading">
+                    <div class="card-header"
+                        style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
+                        <h2 id="iotHeading" style="display:flex;align-items:center;gap:.5rem;margin:0;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" aria-hidden="true">
+                                <rect x="2" y="3" width="20" height="14" rx="2" />
+                                <line x1="8" y1="21" x2="16" y2="21" />
+                                <line x1="12" y1="17" x2="12" y2="21" />
+                            </svg>
+                            IoT Device Hub
+                            <span
+                                style="font-size:.65rem;font-weight:600;background:rgba(38,222,129,.12);color:#26de81;border:1px solid rgba(38,222,129,.3);border-radius:99px;padding:.15rem .55rem;">WEARABLE
+                                SYNC</span>
+                        </h2>
+                        <div style="display:flex;gap:.5rem;">
+                            {% if session.get('access_level') == 'admin' %}
+                            <button id="startSimBtn" class="btn-primary" style="font-size:.78rem;padding:.45rem .8rem;">
+                                Simulate Device</button>
+                            <button id="stopSimBtn" class="btn-secondary"
+                                style="font-size:.78rem;padding:.45rem .8rem;display:none;"> Stop</button>
+                            {% endif %}
+                            <button id="refreshDevicesBtn" class="btn-secondary"
+                                style="font-size:.78rem;padding:.45rem .8rem;"> Refresh</button>
+                        </div>
+                    </div>
+
+                    <!-- Device Table -->
+                    <div style="overflow-x:auto;margin-bottom:.75rem;">
+                        <table style="width:100%;border-collapse:collapse;font-size:.78rem;" id="devicesTable">
+                            <thead>
+                                <tr style="border-bottom:1px solid rgba(0,212,255,.12);">
+                                    <th
+                                        style="text-align:left;padding:.5rem .75rem;color:#6b7db3;font-weight:700;font-size:.68rem;text-transform:uppercase;letter-spacing:.8px;">
+                                        Device ID</th>
+                                    <th
+                                        style="text-align:left;padding:.5rem .75rem;color:#6b7db3;font-weight:700;font-size:.68rem;text-transform:uppercase;letter-spacing:.8px;">
+                                        Type</th>
+                                    <th
+                                        style="text-align:left;padding:.5rem .75rem;color:#6b7db3;font-weight:700;font-size:.68rem;text-transform:uppercase;letter-spacing:.8px;">
+                                        Patient</th>
+                                    <th
+                                        style="text-align:left;padding:.5rem .75rem;color:#6b7db3;font-weight:700;font-size:.68rem;text-transform:uppercase;letter-spacing:.8px;">
+                                        Status</th>
+                                    <th
+                                        style="text-align:left;padding:.5rem .75rem;color:#6b7db3;font-weight:700;font-size:.68rem;text-transform:uppercase;letter-spacing:.8px;">
+                                        Packets</th>
+                                    <th
+                                        style="text-align:left;padding:.5rem .75rem;color:#6b7db3;font-weight:700;font-size:.68rem;text-transform:uppercase;letter-spacing:.8px;">
+                                        Last Seen</th>
+                                </tr>
+                            </thead>
+                            <tbody id="devicesTableBody">
+                                <tr>
+                                    <td colspan="6"
+                                        style="text-align:center;padding:1rem;color:#4a5580;font-size:.78rem;">No
+                                        devices registered yet. Click "Simulate Device" to demo.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Live Data Stream Log -->
+                    <div
+                        style="background:rgba(5,8,20,.6);border:1px solid rgba(0,212,255,.1);border-radius:10px;padding:.65rem .85rem;">
+                        <div
+                            style="font-size:.68rem;font-weight:700;color:#6b7db3;text-transform:uppercase;letter-spacing:.8px;margin-bottom:.4rem;">
+                            Live Data Stream</div>
+                        <div id="iotStreamLog"
+                            style="height:120px;overflow-y:auto;font-family:'JetBrains Mono',monospace;font-size:.72rem;color:#00d4ff;line-height:1.5;">
+                            <span style="color:#4a5580;">Waiting for device stream...</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- EMERGENCY ALERT CONFIG (admin only) -->
+                {% if session.get('access_level') == 'admin' %}
+                <section class="card" id="alertSection" aria-labelledby="alertHeading">
+                    <div class="card-header"
+                        style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
+                        <h2 id="alertHeading" style="display:flex;align-items:center;gap:.5rem;margin:0;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ff4757"
+                                stroke-width="2" aria-hidden="true">
+                                <polygon
+                                    points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2" />
+                                <line x1="12" y1="8" x2="12" y2="12" />
+                                <line x1="12" y1="16" x2="12.01" y2="16" />
+                            </svg>
+                            Emergency Alert System
+                            <span
+                                style="font-size:.65rem;font-weight:600;background:rgba(255,71,87,.12);color:#ff4757;border:1px solid rgba(255,71,87,.3);border-radius:99px;padding:.15rem .55rem;">ADMIN
+                                ONLY</span>
+                        </h2>
+                        <div style="display:flex;gap:.5rem;">
+                            <button id="testAlertBtn" class="btn-secondary"
+                                style="font-size:.78rem;padding:.45rem .8rem;border-color:rgba(255,165,0,.4);color:#ffa500;">
+                                Test Alert</button>
+                            <button id="saveAlertConfigBtn" class="btn-primary"
+                                style="font-size:.78rem;padding:.45rem .8rem;"> Save Config</button>
+                        </div>
+                    </div>
+
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:.75rem;"
+                        class="alert-config-grid">
+                        <!-- Thresholds -->
+                        <div>
+                            <div
+                                style="font-size:.72rem;font-weight:700;color:#ffa500;text-transform:uppercase;letter-spacing:.8px;margin-bottom:.6rem;">
+                                Alert Thresholds</div>
+                            <div style="display:flex;flex-direction:column;gap:.5rem;">
+                                <label style="font-size:.75rem;color:#b8c4e0;">SpO Critical Below (%)
+                                    <input type="number" id="threshSpo2" value="90" min="60" max="98" step="1"
+                                        style="width:80px;float:right;background:rgba(30,38,65,.9);border:1px solid rgba(0,212,255,.2);border-radius:8px;color:#f0f4ff;padding:.3rem .6rem;font-size:.8rem;outline:none;">
+                                </label>
+                                <label style="font-size:.75rem;color:#b8c4e0;">Systolic BP High Crit (mmHg)
+                                    <input type="number" id="threshSbpHigh" value="180" min="140" max="250"
+                                        style="width:80px;float:right;background:rgba(30,38,65,.9);border:1px solid rgba(0,212,255,.2);border-radius:8px;color:#f0f4ff;padding:.3rem .6rem;font-size:.8rem;outline:none;">
+                                </label>
+                                <label style="font-size:.75rem;color:#b8c4e0;">HR High Critical (bpm)
+                                    <input type="number" id="threshHrHigh" value="150" min="100" max="250"
+                                        style="width:80px;float:right;background:rgba(30,38,65,.9);border:1px solid rgba(0,212,255,.2);border-radius:8px;color:#f0f4ff;padding:.3rem .6rem;font-size:.8rem;outline:none;">
+                                </label>
+                                <label style="font-size:.75rem;color:#b8c4e0;">UCRS Critical Threshold
+                                    <input type="number" id="threshUcrs" value="70" min="30" max="100"
+                                        style="width:80px;float:right;background:rgba(30,38,65,.9);border:1px solid rgba(0,212,255,.2);border-radius:8px;color:#f0f4ff;padding:.3rem .6rem;font-size:.8rem;outline:none;">
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Emergency Contacts -->
+                        <div>
+                            <div
+                                style="font-size:.72rem;font-weight:700;color:#ff4757;text-transform:uppercase;letter-spacing:.8px;margin-bottom:.6rem;">
+                                Emergency Contacts</div>
+                            <div id="contactsList"
+                                style="display:flex;flex-direction:column;gap:.4rem;max-height:130px;overflow-y:auto;">
+                            </div>
+                            <div style="display:flex;gap:.4rem;margin-top:.5rem;">
+                                <input type="text" id="newContactName" placeholder="Name"
+                                    style="flex:1;background:rgba(30,38,65,.9);border:1px solid rgba(0,212,255,.2);border-radius:8px;color:#f0f4ff;padding:.35rem .6rem;font-size:.75rem;outline:none;">
+                                <input type="email" id="newContactEmail" placeholder="Email"
+                                    style="flex:2;background:rgba(30,38,65,.9);border:1px solid rgba(0,212,255,.2);border-radius:8px;color:#f0f4ff;padding:.35rem .6rem;font-size:.75rem;outline:none;">
+                                <button id="addContactBtn"
+                                    style="background:rgba(0,212,255,.15);border:1px solid rgba(0,212,255,.3);color:#00d4ff;border-radius:8px;padding:.35rem .65rem;font-size:.8rem;cursor:pointer;font-weight:700;">+</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Alert Logs -->
+                    <div
+                        style="background:rgba(255,71,87,.04);border:1px solid rgba(255,71,87,.12);border-radius:10px;padding:.65rem .85rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;">
+                            <div
+                                style="font-size:.68rem;font-weight:700;color:#ff4757;text-transform:uppercase;letter-spacing:.8px;">
+                                Recent Alerts</div>
+                            <button id="refreshAlertsBtn" onclick="refreshAlerts()"
+                                style="background:none;border:none;color:#6b7db3;font-size:.7rem;cursor:pointer;">
+                                Refresh</button>
+                        </div>
+                        <div id="alertsLog" style="max-height:130px;overflow-y:auto;font-size:.75rem;">
+                            <span style="color:#4a5580;font-size:.78rem;">No alerts fired yet.</span>
+                        </div>
+                    </div>
+                </section>
+                {% endif %}
+
+            </div>
+        </main>
+
+        <footer class="footer" role="contentinfo"
+            style="border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 1.5rem; padding-bottom: 2rem; margin-top: 1rem; color: #6b7db3; font-size: 0.75rem; text-align: center;">
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 0.8rem; width: 100%;">
+                <div style="display: flex; gap: 1.5rem; justify-content: center;">
+                    <a href="#"
+                        onclick="var m=document.getElementById('privacyModal');if(m)m.style.display='flex';return false;"
+                        style="color: #6b7db3; text-decoration: none; transition: color 0.2s;">Privacy</a>
+                    <a href="#"
+                        onclick="var m=document.getElementById('termsModal');if(m)m.style.display='flex';return false;"
+                        style="color: #6b7db3; text-decoration: none; transition: color 0.2s;">Terms</a>
+                    <a href="#"
+                        onclick="var m=document.getElementById('disclaimerModal');if(m)m.style.display='flex';return false;"
+                        style="color: #6b7db3; text-decoration: none; transition: color 0.2s;">Clinical Disclaimer</a>
+                </div>
+                <div>
+                    <span style="font-weight: 600; color: #a0c4e8;">Cardiac Monitor Pro</span> &copy; 2026. All rights
+                    reserved.
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- ===== REAL-TIME MONITOR MODAL ===== -->
+    <div class="modal" id="realTimeModal" role="dialog" aria-modal="true" aria-labelledby="realtimeModalTitle"
+        style="display:none;">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2 id="realtimeModalTitle">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        aria-hidden="true">
+                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                    </svg>
+                    Real-Time ECG Monitor
+                </h2>
+                <button class="modal-close" id="closeRealTimeModal" aria-label="Close">&#x2715;</button>
+            </div>
+            <div class="modal-body">
+                <div class="realtime-controls">
+                    <input type="text" id="patientIdInput" placeholder="Patient ID" value="PATIENT_001"
+                        aria-label="Patient ID">
+                    <button class="btn-primary" id="startMonitoringBtn">Start Monitoring</button>
+                    <button class="btn-secondary" id="stopMonitoringBtn" disabled>Stop</button>
+                    <span class="monitoring-badge" id="monitoringStatus">Idle</span>
+                </div>
+                <div id="realtimeECGPlot" class="plot-container" role="img" aria-label="Real-time ECG stream"></div>
+                <div class="realtime-alerts" id="realtimeAlerts" role="alert" aria-live="assertive"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== PATIENTS MODAL ===== -->
+    <div class="modal" id="patientsModal" role="dialog" aria-modal="true" aria-labelledby="patientsModalTitle"
+        style="display:none;">
+        <div class="modal-content" style="max-width:940px;">
+            <div class="modal-header">
+                <h2 id="patientsModalTitle">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        aria-hidden="true">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </svg>
+                    Patient Management
+                </h2>
+                <button class="modal-close" id="closePatientsModal" aria-label="Close">&#x2715;</button>
+            </div>
+            <div class="modal-body">
+                <div class="table-toolbar">
+                    <input type="text" id="patientSearch" placeholder="Search patients..." class="search-input"
+                        aria-label="Search patients">
+                    <button class="btn-primary btn--sm" id="addPatientBtn">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.5" aria-hidden="true">
+                            <line x1="12" y1="5" x2="12" y2="19" />
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                        </svg>
+                        Add Patient
+                    </button>
+                </div>
+                <div class="responsive-table-wrapper">
+                    <table class="data-table" id="patientsTable" aria-label="Patient list">
+                        <thead>
+                            <tr>
+                                <th scope="col">ID</th>
+                                <th scope="col">Name</th>
+                                <th scope="col">Age</th>
+                                <th scope="col">Gender</th>
+                                <th scope="col">Contact</th>
+                                <th scope="col">Medical History</th>
+                                <th scope="col">Analyses</th>
+                            </tr>
+                        </thead>
+                        <tbody id="patientsTableBody">
+                            <tr>
+                                <td colspan="7" class="table-empty">Loading patients...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== SETTINGS MODAL ===== -->
+    <div class="modal" id="settingsModal" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle"
+        style="display:none;">
+        <div class="modal-content" style="max-width:520px;">
+            <div class="modal-header">
+                <h2 id="settingsModalTitle">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        aria-hidden="true">
+                        <circle cx="12" cy="12" r="3" />
+                        <path
+                            d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M12 2v2m0 16v2m7.07-14.07l-1.41 1.41M4.93 19.07l1.41-1.41M2 12h2m16 0h2" />
+                    </svg>
+                    Settings
+                </h2>
+                <button class="modal-close" id="closeSettingsModal" aria-label="Close">&#x2715;</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-group">
+                    <h3>Appearance</h3>
+                    <div class="settings-row">
+                        <label class="settings-label" for="themeSwitch">Dark Mode</label>
+                        <label class="toggle-switch" for="themeSwitch" aria-label="Toggle dark mode">
+                            <input type="checkbox" id="themeSwitch" checked>
+                            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                        </label>
+                    </div>
+                </div>
+                <div class="settings-group">
+                    <h3>About</h3>
+                    <div class="settings-info">
+                        <div class="info-row"><span>Version</span><code>3.0 Advanced</code></div>
+                        <div class="info-row"><span>Model</span><code>Ensemble (RF + GB + ET)</code></div>
+                        <div class="info-row"><span>Database</span><code>MongoDB</code></div>
+                        <div class="info-row"><span>Features</span><code>50+ cardiometric</code></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== TOAST CONTAINER ===== -->
+    <div id="toastContainer" class="toast-container" aria-live="polite" aria-label="Notifications"></div>
+
+    <!-- ===== FLOATING AI ASSISTANT ===== -->
+    <style>
+        /*              Floating bot button                                                                                                                                                                                                                                            */
+        #assistantFab {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #1e00ff 0%, #00d4ff 100%);
+            border: 2px solid rgba(0, 212, 255, 0.4);
+            cursor: pointer;
+            box-shadow: 0 8px 32px rgba(30, 0, 255, .5), inset 0 2px 4px rgba(255, 255, 255, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9998;
+            transition: all .35s cubic-bezier(.175, 0.885, 0.32, 1.275);
+            animation: fabPulse 3s ease-in-out infinite;
+        }
+
+        #assistantFab:hover {
+            transform: scale(1.12);
+            box-shadow: 0 10px 40px rgba(0, 212, 255, .6), 0 2px 8px rgba(0, 0, 0, .4);
+        }
+
+        #assistantFab.open {
+            animation: none;
+            transform: scale(1.05) rotate(15deg);
+        }
+
+        @keyframes fabPulse {
+
+            0%,
+            100% {
+                box-shadow: 0 8px 32px rgba(30, 0, 255, .5), inset 0 2px 4px rgba(255, 255, 255, 0.4), 0 0 0 0 rgba(0, 212, 255, .4);
+            }
+
+            50% {
+                box-shadow: 0 8px 32px rgba(30, 0, 255, .5), inset 0 2px 4px rgba(255, 255, 255, 0.4), 0 0 0 15px rgba(0, 212, 255, 0);
+            }
+        }
+
+        #assistantFab svg {
+            width: 28px;
+            height: 28px;
+            fill: #fff;
+            transition: opacity .2s;
+        }
+
+        #fabCloseIcon {
+            display: none;
+        }
+
+        /*              Chat panel                                                                                                                                                                                                                                                                                                  */
+        #assistantPanel {
+            position: fixed;
+            bottom: 110px;
+            right: 30px;
+            width: 380px;
+            max-width: calc(100vw - 40px);
+            height: 600px;
+            max-height: calc(100vh - 140px);
+            background: rgba(8, 10, 25, 0.85);
+            /* Darker, more transparent base */
+            backdrop-filter: blur(36px);
+            /* Heavy blur */
+            -webkit-backdrop-filter: blur(36px);
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            border-top: 1px solid rgba(255, 255, 255, 0.15);
+            /* Light top edge */
+            border-left: 1px solid rgba(255, 255, 255, 0.08);
+            /* Light left edge */
+            border-radius: 24px;
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.8),
+                0 0 30px rgba(30, 0, 255, 0.15),
+                inset 0 1px 1px rgba(255, 255, 255, 0.1);
+            /* Inner glow */
+            display: flex;
+            flex-direction: column;
+            z-index: 9997;
+            overflow: hidden;
+            transform: translateY(30px) scale(.9);
+            opacity: 0;
+            pointer-events: none;
+            transition: all .4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        #assistantPanel.open {
+            transform: translateY(0) scale(1);
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        /* panel header */
+        .asst-header {
+            display: flex;
+            align-items: center;
+            gap: .85rem;
+            padding: 1.2rem 1.4rem;
+            background: linear-gradient(135deg, rgba(30, 0, 255, 0.15), rgba(0, 212, 255, 0.05));
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        /* Subtle glow line under header */
+        .asst-header::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.6), transparent);
+        }
+
+        .asst-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #00d4ff, #0077ff);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .asst-avatar svg {
+            width: 18px;
+            height: 18px;
+            fill: #fff;
+        }
+
+        .asst-title {
+            flex: 1;
+        }
+
+        .asst-title strong {
+            display: block;
+            font-size: .9rem;
+            font-weight: 700;
+            color: #f0f4ff;
+        }
+
+        .asst-title span {
+            font-size: .7rem;
+            color: #26de81;
+            display: flex;
+            align-items: center;
+            gap: .3rem;
+        }
+
+        .asst-title span::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #26de81;
+            animation: blink 1.4s infinite;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: .3
+            }
+        }
+
+        .asst-close-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: .3rem;
+            color: #6b7db3;
+            transition: color .2s;
+        }
+
+        .asst-close-btn:hover {
+            color: #f0f4ff;
+        }
+
+        /* messages */
+        .asst-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.25rem 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(0, 212, 255, .3) transparent;
+        }
+
+        .asst-messages::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        .asst-messages::-webkit-scrollbar-thumb {
+            background: rgba(0, 212, 255, .3);
+            border-radius: 5px;
+        }
+
+        .msg {
+            display: flex;
+            gap: .65rem;
+            max-width: 90%;
+            animation: messageSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        @keyframes messageSlideIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .msg--bot {
+            align-self: flex-start;
+        }
+
+        .msg--user {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+
+        .msg-bubble {
+            padding: .75rem 1rem;
+            border-radius: 18px;
+            font-size: .875rem;
+            line-height: 1.55;
+            font-family: 'Inter', sans-serif;
+            position: relative;
+        }
+
+        .msg--bot .msg-bubble {
+            background: rgba(18, 22, 45, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-left: 3px solid #00d4ff;
+            color: #dbe4ff;
+            border-bottom-left-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .msg--user .msg-bubble {
+            background: linear-gradient(135deg, #2a00ff, #00b4d8);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #ffffff;
+            border-bottom-right-radius: 6px;
+            box-shadow: 0 4px 15px rgba(0, 119, 255, 0.3);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        }
+
+        .msg-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            margin-top: 4px;
+            /* Align with top of larger bubble */
+            background: linear-gradient(135deg, rgba(30, 0, 255, 0.2), rgba(0, 212, 255, 0.2));
+            border: 1px solid rgba(0, 212, 255, .3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1), 0 0 10px rgba(0, 212, 255, 0.15);
+            color: #00d4ff;
+        }
+
+        .msg-icon svg {
+            width: 15px;
+            height: 15px;
+            fill: currentColor;
+        }
+
+        /* typing animation */
+        .typing-dots {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: .4rem .2rem;
+        }
+
+        .typing-dots span {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #00d4ff;
+            animation: dot 1.2s infinite ease-in-out;
+        }
+
+        .typing-dots span:nth-child(2) {
+            animation-delay: .2s;
+        }
+
+        .typing-dots span:nth-child(3) {
+            animation-delay: .4s;
+        }
+
+        @keyframes dot {
+
+            0%,
+            80%,
+            100% {
+                transform: scale(.6);
+                opacity: .4
+            }
+
+            40% {
+                transform: scale(1);
+                opacity: 1
+            }
+        }
+
+        /* quick chips */
+        .asst-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .4rem;
+            padding: .5rem 1rem .75rem;
+            flex-shrink: 0;
+        }
+
+        .chip {
+            padding: .35rem .8rem;
+            font-size: .72rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid rgba(0, 212, 255, .15);
+            border-radius: 12px;
+            background: rgba(0, 212, 255, .05);
+            color: #a0c4e8;
+            transition: all .2s cubic-bezier(0.16, 1, 0.3, 1);
+            white-space: nowrap;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        .chip:hover {
+            background: rgba(0, 212, 255, .15);
+            color: #ffffff;
+            border-color: rgba(0, 212, 255, .4);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0, 212, 255, 0.2);
+        }
+
+        /* input area */
+        .asst-input-row {
+            display: flex;
+            gap: .6rem;
+            padding: 1rem 1.25rem;
+            border-top: 1px solid rgba(255, 255, 255, .05);
+            background: rgba(4, 6, 20, .8);
+            flex-shrink: 0;
+            align-items: center;
+        }
+
+        #assistantInput {
+            flex: 1;
+            background: rgba(255, 255, 255, .03);
+            border: 1px solid rgba(255, 255, 255, .08);
+            border-radius: 16px;
+            color: #f0f4ff;
+            font-family: 'Inter', sans-serif;
+            font-size: .875rem;
+            padding: .75rem 1rem;
+            outline: none;
+            transition: all .25s ease;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        #assistantInput:focus {
+            background: rgba(0, 212, 255, .05);
+            border-color: rgba(0, 212, 255, .4);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2), 0 0 0 3px rgba(0, 212, 255, .15);
+        }
+
+        #assistantInput::placeholder {
+            color: #5a6a8a;
+        }
+
+        /* Gemini Badge */
+        .gemini-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: linear-gradient(90deg, rgba(82, 0, 255, 0.15), rgba(0, 212, 255, 0.15));
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            color: #00d4ff;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 6px;
+            align-self: flex-start;
+        }
+
+        .gemini-badge svg {
+            width: 10px;
+            height: 10px;
+            fill: currentColor;
+        }
+
+        #assistantSendBtn {
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
+            border: none;
+            cursor: pointer;
+            background: linear-gradient(135deg, #0077ff, #00d4ff);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform .2s, box-shadow .2s;
+            flex-shrink: 0;
+        }
+
+        #assistantSendBtn:hover {
+            transform: scale(1.08);
+            box-shadow: 0 4px 14px rgba(0, 212, 255, .4);
+        }
+
+        #assistantSendBtn svg {
+            width: 16px;
+            height: 16px;
+            fill: #fff;
+        }
+
+        @media (max-width:480px) {
+            #assistantPanel {
+                width: calc(100vw - 24px);
+                right: 12px;
+                bottom: 84px;
+            }
+
+            #assistantFab {
+                bottom: 16px;
+                right: 16px;
+            }
+        }
+    </style>
+
+    <!-- FAB Button -->
+    <button id="assistantFab" aria-label="Open AI Assistant" title="Cardiac AI Assistant">
+        <svg id="fabBotIcon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path
+                d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.38-1 1.73V7h3a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3v-8a3 3 0 0 1 3-3h3V5.73A2 2 0 0 1 10 4a2 2 0 0 1 2-2zm-4 9a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm8 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm-4 4c-1.5 0-2.5.67-3 1h6c-.5-.33-1.5-1-3-1z" />
+        </svg>
+        <svg id="fabCloseIcon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M18 6L6 18M6 6l12 12" stroke="#fff" stroke-width="2.5" stroke-linecap="round" fill="none" />
+        </svg>
+    </button>
+
+    <!-- Chat Panel -->
+    <div id="assistantPanel" role="dialog" aria-modal="false" aria-label="Cardiac AI Assistant">
+        <div class="asst-header">
+            <div class="asst-avatar">
+                <svg viewBox="0 0 24 24">
+                    <path
+                        d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.38-1 1.73V7h3a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3v-8a3 3 0 0 1 3-3h3V5.73A2 2 0 0 1 10 4a2 2 0 0 1 2-2zm-4 9a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm8 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm-4 4c-1.5 0-2.5.67-3 1h6c-.5-.33-1.5-1-3-1z" />
+                </svg>
+            </div>
+            <div class="asst-title">
+                <strong>Cardiac AI Assistant</strong>
+                <span>Online &mdash; ready to help</span>
+            </div>
+            <button class="asst-close-btn" id="assistantCloseBtn" aria-label="Close assistant">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+
+        <div class="asst-messages" id="assistantMessages">
+            <!-- Welcome message populated by JS -->
+        </div>
+
+        <div class="asst-chips" id="assistantChips">
+            <button class="chip" data-q="What is arrhythmia?">Arrhythmia</button>
+            <button class="chip" data-q="How to upload ECG?">Upload ECG</button>
+            <button class="chip" data-q="What does confidence mean?">Confidence</button>
+            <button class="chip" data-q="What is SHAP?">SHAP / XAI</button>
+            <button class="chip" data-q="How to generate a report?">Reports</button>
+            <button class="chip" data-q="What is heart rate variability?">HRV</button>
+        </div>
+
+        <div class="asst-input-row">
+            <input type="text" id="assistantInput" placeholder="Ask about cardiac analysis..." autocomplete="off"
+                maxlength="300">
+            <button id="assistantSendBtn" aria-label="Send">
+                <svg viewBox="0 0 24 24">
+                    <path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z" />
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /* ============================================================
+           CARDIAC AI ASSISTANT        Knowledge Base + Chat Engine
+        ============================================================ */
+        (function () {
+            const KB = [
+                {
+                    keys: ['arrhythmia', 'irregular', 'rhythm', 'afib', 'atrial fibrillation'],
+                    answer: '           <b>Arrhythmia</b> is an irregular heart rhythm. The system detects it from ECG signals by analyzing R-peak intervals and waveform morphology. Symptoms include palpitations, dizziness, or shortness of breath. Always consult a cardiologist if detected.'
+                },
+                {
+                    keys: ['myocardial infarction', 'heart attack', 'mi', 'st elevation'],
+                    answer: ' <b>Myocardial Infarction (MI)</b> is a heart attack caused by blocked coronary arteries. The system identifies it via ST-segment elevation patterns in the ECG. If detected        <b>seek emergency care immediately</b>.'
+                },
+                {
+                    keys: ['upload', 'file', 'csv', 'txt', 'json', 'ecg data', 'how to upload'],
+                    answer: '   To <b>upload an ECG</b>: drag & drop your file into the upload area, or click <i>"click to browse"</i>. Supported formats: <b>CSV, TXT, JSON</b>. Max size 10 MB. Then click <b>Analyze ECG</b> to get results.'
+                },
+                {
+                    keys: ['sample', 'generate', 'demo', 'example ecg'],
+                    answer: '     Use the <b>"Generate Sample"</b> button to create a synthetic ECG signal for demonstration. It lets you test the full analysis pipeline without uploading a real file.'
+                },
+                {
+                    keys: ['confidence', 'certainty', 'accuracy', 'probability', 'score'],
+                    answer: '         <b>Confidence</b> is how certain the ML model is about its prediction (0      100%). A high confidence (>80%) means the model is very sure. Lower confidence suggests borderline signals. Also check the <b>Disease Probabilities</b> bars for a breakdown.'
+                },
+                {
+                    keys: ['shap', 'xai', 'explainable', 'explain', 'feature importance', 'why'],
+                    answer: '   <b>SHAP (SHapley Additive exPlanations)</b> shows which ECG features most influenced the prediction        e.g., Heart Rate, HRV, QRS width. This makes the AI explainable rather than a black box.'
+                },
+                {
+                    keys: ['gradcam', 'grad-cam', 'heatmap', 'highlight'],
+                    answer: '       <b>Grad-CAM</b> is a visual heatmap overlaid on the ECG signal showing <i>which regions</i> the model focused on most when making its prediction. Brighter areas = higher influence.'
+                },
+                {
+                    keys: ['report', 'pdf', 'download', 'generate report'],
+                    answer: '    After an analysis, click <b>"PDF Report"</b> to download a clinical report including: patient ID, diagnosis, confidence, probabilities, cardiometric features, and clinical recommendations.'
+                },
+                {
+                    keys: ['hrv', 'heart rate variability', 'sdnn', 'rmssd', 'pnn50'],
+                    answer: ' <b>HRV (Heart Rate Variability)</b> measures the variation in time between heartbeats. Key metrics: <b>SDNN</b> (overall variability), <b>RMSSD</b> (short-term changes), <b>pNN50</b> (proportion of large differences). Higher HRV generally indicates good cardiac health.'
+                },
+                {
+                    keys: ['heart rate', 'bpm', 'beats per minute', 'pulse', 'tachycardia', 'bradycardia'],
+                    answer: ' Normal <b>heart rate</b> is 60      100 bpm. Above 100 = Tachycardia, below 60 = Bradycardia. The system calculates heart rate from R-peak intervals detected in your ECG signal.'
+                },
+                {
+                    keys: ['risk', 'risk level', 'low risk', 'medium risk', 'high risk', 'gauge'],
+                    answer: '       The <b>Risk Level</b> (Low / Medium / High) is computed from the predicted condition and confidence score. High risk (e.g., MI or high-confidence arrhythmia) requires immediate medical attention. Use the risk gauge on the dashboard to monitor changes.'
+                },
+                {
+                    keys: ['patient', 'manage', 'add patient', 'patient list', 'history'],
+                    answer: '   Use the <b>Patients</b> button in the top navigation to manage patient records. Select a patient from the dropdown bar to load their history timeline and see past ECG analyses.'
+                },
+                {
+                    keys: ['live', 'real time', 'stream', 'websocket', 'monitoring'],
+                    answer: ' Click <b>"Live Monitor"</b> in the top navigation to open the real-time ECG streaming dashboard. Enter a Patient ID and click <b>Start Monitoring</b> to begin live WebSocket-based ECG analysis.'
+                },
+                {
+                    keys: ['normal', 'healthy', 'no abnormality'],
+                    answer: 'A <b>Normal</b> result means the ECG shows no detectable cardiac abnormalities. Continue routine monitoring. For sustained peace of mind, schedule a checkup every 6 months.'
+                },
+                {
+                    keys: ['login', 'sign in', 'register', 'account', 'password', 'username'],
+                    answer: '   Use the login page to sign in with your credentials. You can also create a new account via <b>Create Account</b>. Admin users can run analyses; Viewer accounts have read-only access.'
+                },
+                {
+                    keys: ['hello', 'hi', 'hey', 'help', 'what can you do'],
+                    answer: ' Hello! I\'m your <b>Cardiac AI Assistant</b>. I can help you with:<br>Understanding ECG analysis results<br>Explaining cardiac conditions (Arrhythmia, MI, etc.)<br>Navigating the dashboard<br>Interpreting AI explanations (SHAP, Grad-CAM)<br><br>Just type your question or tap a quick-reply chip below!'
+                },
+            ];
+
+            const FALLBACK = "I'm not sure about that. Try asking about <b>arrhythmia</b>, <b>ECG upload</b>, <b>confidence scores</b>, or <b>SHAP explanations</b>. Or consult the clinical documentation for advanced queries.";
+
+            function findAnswer(text) {
+                const q = text.toLowerCase();
+                for (const item of KB) {
+                    if (item.keys.some(k => q.includes(k))) return item.answer;
+                }
+                return FALLBACK;
+            }
+
+            /*              DOM refs                                                                                                                                                                                                                                                                                            */
+            const fab = document.getElementById('assistantFab');
+            const panel = document.getElementById('assistantPanel');
+            const closeBtn = document.getElementById('assistantCloseBtn');
+            const messages = document.getElementById('assistantMessages');
+            const input = document.getElementById('assistantInput');
+            const sendBtn = document.getElementById('assistantSendBtn');
+            const chips = document.getElementById('assistantChips');
+            const botIcon = document.getElementById('fabBotIcon');
+            const closeIcon = document.getElementById('fabCloseIcon');
+
+            let isOpen = false;
+
+            /*              Open / close                                                                                                                                                                                                                                                                    */
+            function openPanel() {
+                isOpen = true;
+                panel.classList.add('open');
+                fab.classList.add('open');
+                botIcon.style.display = 'none';
+                closeIcon.style.display = 'block';
+                fab.setAttribute('aria-label', 'Close AI Assistant');
+                input.focus();
+            }
+            function closePanel() {
+                isOpen = false;
+                panel.classList.remove('open');
+                fab.classList.remove('open');
+                botIcon.style.display = 'block';
+                closeIcon.style.display = 'none';
+                fab.setAttribute('aria-label', 'Open AI Assistant');
+            }
+
+            fab.addEventListener('click', () => isOpen ? closePanel() : openPanel());
+            closeBtn.addEventListener('click', closePanel);
+
+            /*              Append message                                                                                                                                                                                                                                                        */
+            function appendMsg(html, who, isGemini = false) {
+                const div = document.createElement('div');
+                div.className = `msg msg--${who}`;
+
+                let iconSvg = '';
+                if (who === 'bot') {
+                    // New Bot Icon
+                    iconSvg = `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-2-5.5l7-4.5-7-4.5v9z"/></svg>`;
+                } else {
+                    // New User Icon
+                    iconSvg = `<svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>`;
+                }
+
+                let badgeHtml = '';
+                if (who === 'bot' && isGemini) {
+                    badgeHtml = `
+                    <div class="gemini-badge">
+                        <svg viewBox="0 0 24 24"><path d="M12 2.25L14.7 9.3l7.05 2.7-7.05 2.7-2.7 7.05-2.7-7.05L2.25 12l7.05-2.7z"/></svg>
+                        Gemini AI
+                    </div>`;
+                }
+
+                div.innerHTML = `
+                    <div class="msg-icon">${iconSvg}</div>
+                    <div style="display: flex; flex-direction: column; max-width: 100%;">
+                        <div class="msg-bubble">${html}</div>
+                        ${badgeHtml}
+                    </div>
+                `;
+                messages.appendChild(div);
+                messages.scrollTop = messages.scrollHeight;
+                return div;
+            }
+
+            /*              Typing indicator                                                                                                                                                                                                                                            */
+            function showTyping() {
+                const div = document.createElement('div');
+                div.className = 'msg msg--bot'; div.id = 'typingIndicator';
+                div.innerHTML = `<div class="msg-icon"><svg viewBox="0 0 24 24" fill="#00d4ff" width="13" height="13"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.38-1 1.73V7h3a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3v-8a3 3 0 0 1 3-3h3V5.73A2 2 0 0 1 10 4a2 2 0 0 1 2-2zm-4 9a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm8 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm-4 4c-1.5 0-2.5.67-3 1h6c-.5-.33-1.5-1-3-1z"/></svg></div><div class="msg-bubble"><div class="typing-dots"><span></span><span></span><span></span></div></div>`;
+                messages.appendChild(div);
+                messages.scrollTop = messages.scrollHeight;
+            }
+            function hideTyping() {
+                const el = document.getElementById('typingIndicator');
+                if (el) el.remove();
+            }
+
+            /*              Send message                                                                                                                                                                                                                                                                    */
+            async function sendMessage(text) {
+                if (!text.trim()) return;
+                appendMsg(escHtml(text), 'user');
+                input.value = '';
+                chips.style.display = 'none';
+                showTyping();
+                try {
+                    const res = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: text }),
+                    });
+                    hideTyping();
+                    if (res.ok) {
+                        const data = await res.json();
+                        const isGemini = data.source === 'gemini';
+                        appendMsg(data.reply, 'bot', isGemini);
+                    } else {
+                        appendMsg('       Could not reach the AI backend. Please try again.', 'bot');
+                    }
+                } catch (e) {
+                    hideTyping();
+                    appendMsg('       Network error: ' + escHtml(e.message), 'bot');
+                }
+            }
+
+            function escHtml(t) {
+                return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            }
+
+            sendBtn.addEventListener('click', () => sendMessage(input.value));
+            input.addEventListener('keydown', e => { if (e.key === 'Enter') sendMessage(input.value); });
+
+            /*              Quick chips                                                                                                                                                                                                                                                                          */
+            chips.querySelectorAll('.chip').forEach(chip => {
+                chip.addEventListener('click', () => sendMessage(chip.dataset.q));
+            });
+
+            /*              Welcome message                                                                                                                                                                                                                                                  */
+            appendMsg(' Hi! I\'m your <b>Cardiac AI Assistant</b>. Ask me anything about ECG analysis, cardiac conditions, or how to use this dashboard!', 'bot');
+
+        })();
+    </script>
+
+    <script src="{{ url_for('static', filename='js/app_advanced.js') }}"></script>
+
+    <!-- ===== REAL-WORLD INTEGRATION JS ===== -->
+    <script>
+        (function () {
+            'use strict';
+            const $ = id => document.getElementById(id);
+            const riskColorMap = { 'Low': '#26de81', 'Medium': '#ffa500', 'High': '#ff4757', 'Critical': '#c0392b' };
+            const getRiskColor = r => riskColorMap[r] || '#b8c4e0';
+
+            function renderAlerts(alerts) {
+                const log = $('alertsLog');
+                if (!log || !alerts || alerts.length === 0) return;
+                if (log.innerText.includes('No alerts')) log.innerHTML = '';
+                alerts.forEach(a => {
+                    const line = document.createElement('div');
+                    line.style.cssText = 'border-bottom:1px solid rgba(255,71,87,0.1);padding:0.4rem 0;animation:fadeIn 0.3s;font-size:0.75rem;';
+                    const time = a.timestamp ? new Date(a.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
+                    const rColor = getRiskColor(a.risk_level);
+                    line.innerHTML = `<span style="color:#6b7db3;font-family:monospace;">[${time}]</span> <span style="color:${rColor};font-weight:800;text-transform:uppercase;font-size:0.65rem;margin-right:4px;">${a.risk_level}:</span> <span style="color:#f0f4ff;">${a.message}</span>`;
+                    log.prepend(line);
+                });
+            }
+
+            async function refreshAlerts() {
+                const log = $('alertsLog');
+                if (!log) return;
+                try {
+                    const res = await fetch('/api/alerts/history');
+                    if (res.ok) {
+                        const data = await res.json();
+                        renderAlerts(data.alerts || []);
+                    }
+                } catch (e) { console.error('Alert refresh error', e); }
+            }
+
+            function withSocket(cb) {
+                if (window.socket) { cb(window.socket); return; }
+                document.addEventListener('DOMContentLoaded', () => {
+                    const wait = setInterval(() => { if (window.socket) { clearInterval(wait); cb(window.socket); } }, 200);
+                });
+            }
+
+            withSocket(s => {
+                s.on('iot_data_update', data => {
+                    appendStreamLog(data);
+                    refreshDevices();
+                    if (data.fusion) updateUCRS(data.fusion);
+                });
+
+                s.on('simulator_started', d => {
+                    if ($('startSimBtn')) $('startSimBtn').style.display = 'none';
+                    if ($('stopSimBtn')) $('stopSimBtn').style.display = '';
+                    refreshDevices();
+                });
+                s.on('simulator_stopped', d => {
+                    if ($('startSimBtn')) $('startSimBtn').style.display = '';
+                    if ($('stopSimBtn')) $('stopSimBtn').style.display = 'none';
+                    refreshDevices();
+                });
+                s.on('alert_fired', data => { renderAlerts([data]); });
+            });
+
+            function updateUCRS(fusion) {
+                const score = $('ucrsScore');
+                const badge = $('fusedRiskBadge');
+                if (!fusion || !score) return;
+                const risk = fusion.fused_risk_level;
+                score.textContent = `UCRS: ${fusion.ucrs.toFixed(1)}/100`;
+                score.style.color = getRiskColor(risk);
+                if (badge) {
+                    badge.textContent = `Fused Risk: ${risk}`;
+                    badge.style.background = getRiskColor(risk) + '22';
+                    badge.style.color = getRiskColor(risk);
+                    badge.style.borderColor = getRiskColor(risk) + '66';
+                }
+
+                const commentaryBox = $('vitalsCommentary');
+                const list = $('vitalsCommentaryList');
+                if (fusion.commentary && fusion.commentary.length > 0) {
+                    commentaryBox.style.display = '';
+                    list.innerHTML = fusion.commentary.map(c => `<li>${c}</li>`).join('');
+                }
+            }
+
+            $('submitVitalsBtn')?.addEventListener('click', async () => {
+                const btn = $('submitVitalsBtn');
+                const vitals = {
+                    patient_id: (document.getElementById('selectedPatient') || {}).value || 'PATIENT_001',
+                    spo2: parseFloat($('inputSpo2')?.value) || null,
+                    systolic: parseFloat($('inputSystolic')?.value) || null,
+                    diastolic: parseFloat($('inputDiastolic')?.value) || null,
+                    temperature: parseFloat($('inputTemperature')?.value) || null,
+                    heart_rate: parseFloat($('inputHeartRate')?.value) || null,
+                };
+                btn.disabled = true; btn.textContent = 'Submitting...';
+                try {
+                    const res = await fetch('/api/vitals/submit', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(vitals),
+                    });
+                    const data = await res.json();
+                    if (data.fusion) updateUCRS(data.fusion);
+                    if (data.alert_fired) renderAlerts([data.alert_fired]);
+                } catch (e) {
+                    console.error('Vitals submit error', e);
+                } finally {
+                    btn.disabled = false; btn.textContent = 'Submit Vitals';
+                }
+            });
+
+            $('clearVitalsBtn')?.addEventListener('click', () => {
+                ['inputSpo2', 'inputSystolic', 'inputDiastolic', 'inputTemperature', 'inputHeartRate'].forEach(id => {
+                    if ($(id)) $(id).value = '';
+                });
+                if ($('vitalsCommentary')) $('vitalsCommentary').style.display = 'none';
+            });
+
+            let streamLogCount = 0;
+            function appendStreamLog(data) {
+                const log = $('iotStreamLog');
+                if (!log) return;
+                if (streamLogCount === 0) log.innerHTML = '';
+                streamLogCount++;
+                const d = new Date().toLocaleTimeString();
+                const risk = data.fusion ? data.fusion.fused_risk_level : '?';
+                const line = document.createElement('div');
+                line.style.cssText = `border-bottom:1px solid rgba(0,212,255,.07);padding:.2rem 0;font-size:0.72rem;`;
+                line.innerHTML = `<span style="color:#4a5580;">[${d}]</span> <span style="color:#26de81;">${data.device_id}</span> HR:<b>${data.heart_rate || '?'}</b> Risk:<span style="color:${getRiskColor(risk)}">${risk}</span>`;
+                log.appendChild(line);
+                log.scrollTop = log.scrollHeight;
+                if (streamLogCount > 50) { log.removeChild(log.firstChild); streamLogCount--; }
+            }
+
+            async function refreshDevices() {
+                const tbody = $('devicesTableBody');
+                if (!tbody) return;
+                try {
+                    const res = await fetch('/api/iot/devices');
+                    const data = await res.json();
+                    const devs = data.devices || [];
+                    if (devs.length === 0) return;
+                    tbody.innerHTML = devs.map(d => `
+                        <tr style="border-bottom:1px solid rgba(255,255,255,.04);">
+                            <td style="padding:.5rem .75rem;font-family:monospace;">${d.device_id}</td>
+                            <td style="padding:.5rem .75rem;">${d.device_type}</td>
+                            <td style="padding:.5rem .75rem;color:#00d4ff;">${d.patient_id}</td>
+                            <td style="padding:.5rem .75rem;color:${d.status === 'streaming' ? '#26de81' : '#00d4ff'}">${d.status}</td>
+                            <td style="padding:.5rem .75rem;">${d.packet_count}</td>
+                            <td style="padding:.5rem .75rem;color:#6b7db3;">${d.last_seen ? new Date(d.last_seen).toLocaleTimeString() : '--'}</td>
+                        </tr>`).join('');
+                } catch (e) { }
+            }
+
+            $('startSimBtn')?.addEventListener('click', async () => {
+                const patientId = (document.getElementById('selectedPatient') || {}).value || 'PATIENT_001';
+                await fetch('/api/iot/simulate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'start', patient_id: patientId }),
+                });
+            });
+
+            $('stopSimBtn')?.addEventListener('click', async () => {
+                await fetch('/api/iot/simulate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'stop' }),
+                });
+            });
+
+            $('refreshDevicesBtn')?.addEventListener('click', refreshDevices);
+            refreshDevices();
+            refreshAlerts();
+
+            // ── Patient ECG Tracker ──────────────────────────────────────────
+            (function initTracker() {
+                const trackerSection = $('patientTrackerSection');
+                const patientSel    = $('selectedPatient');
+
+                // Tab switching
+                document.querySelectorAll('.tracker-tab-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        document.querySelectorAll('.tracker-tab-btn').forEach(b => b.classList.remove('active'));
+                        document.querySelectorAll('.tracker-tab-pane').forEach(p => p.classList.remove('active'));
+                        btn.classList.add('active');
+                        const pane = $('trackerPane' + btn.dataset.tab.charAt(0).toUpperCase() + btn.dataset.tab.slice(1));
+                        if (pane) pane.classList.add('active');
+                    });
+                });
+
+                // Load patient ECG history via new API
+                async function loadTrackerHistory(patientId) {
+                    const wrap    = $('trackerTableWrap');
+                    const chips   = $('trackerSummaryChips');
+                    const badge   = $('trackerPatientBadge');
+                    const liveDesc = $('trackerLiveDesc');
+
+                    wrap.innerHTML = '<div style="color:#6b7db3;font-size:.8rem;padding:1rem;">Loading…</div>';
+                    chips.style.display = 'none';
+
+                    try {
+                        const res  = await fetch('/api/patient-ecg-history/' + patientId);
+                        const data = await res.json();
+                        if (!data.success) throw new Error(data.error || 'Failed');
+
+                        const { patient, analyses, summary } = data;
+                        const pName = patient?.name || patientId;
+
+                        // Update badge
+                        if (badge) { badge.textContent = pName + ' · ' + patientId; badge.style.display = ''; }
+
+                        // Update live tab desc
+                        if (liveDesc) liveDesc.innerHTML = `Live streaming ECG for <strong style="color:#00d4ff">${pName}</strong>. Click Start to begin.`;
+
+                        // Summary chips
+                        if (summary) {
+                            chips.innerHTML = [
+                                `<div class="tracker-chip"><span>${summary.total_sessions}</span> Sessions</div>`,
+                                `<div class="tracker-chip"><span>${summary.last_diagnosis}</span> Last Diagnosis</div>`,
+                                `<div class="tracker-chip"><span>${summary.last_confidence}%</span> Last Confidence</div>`,
+                                `<div class="tracker-chip"><span style="color:${summary.last_risk==='High'?'#ff4757':summary.last_risk==='Medium'?'#ffa500':'#26de81'}">${summary.last_risk}</span> Risk</div>`,
+                                `<div class="tracker-chip"><span style="color:#26de81">${summary.risk_counts?.Low||0}</span> Low / <span style="color:#ffa500">${summary.risk_counts?.Medium||0}</span> Med / <span style="color:#ff4757">${summary.risk_counts?.High||0}</span> High</div>`,
+                            ].join('');
+                            chips.style.display = 'flex';
+
+                            // Update patient chip with last diagnosis
+                            const chipRisk = $('chipRisk');
+                            if (chipRisk && summary.last_risk !== 'N/A') {
+                                const rClass = `risk-pill--${summary.last_risk.toLowerCase()}`;
+                                chipRisk.className = `risk-pill ${rClass}`;
+                                chipRisk.textContent = `Last: ${summary.last_diagnosis}`;
+                                chipRisk.style.display = 'inline';
+                            }
+                        }
+
+                        // Table
+                        if (!analyses.length) {
+                            wrap.innerHTML = '<div style="text-align:center;color:#6b7db3;padding:2rem;font-size:.82rem;">No ECG sessions recorded for this patient yet.<br>Use the <strong>Upload &amp; Analyze</strong> tab or the main upload above to add one.</div>';
+                            return;
+                        }
+
+                        wrap.innerHTML = `
+                            <div style="overflow-x:auto;">
+                            <table class="ecg-records-table">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Date &amp; Time</th>
+                                        <th>Diagnosis</th>
+                                        <th>Confidence</th>
+                                        <th>Risk</th>
+                                        <th>Heart Rate</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="trackerTbody"></tbody>
+                            </table>
+                            </div>`;
+
+                        const tbody = $('trackerTbody');
+                        analyses.forEach((a, i) => {
+                            const ts    = a.analysis_timestamp || a.timestamp || '';
+                            const d     = ts ? new Date(ts) : null;
+                            const dateStr = d ? d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : 'N/A';
+                            const rl    = a.risk_level || 'Low';
+                            const rColor = rl === 'High' ? '#ff4757' : rl === 'Medium' ? '#ffa500' : '#26de81';
+                            const conf  = a.confidence ? (a.confidence * 100).toFixed(1) + '%' : '—';
+                            const hr    = a.heart_rate ? Math.round(a.heart_rate) + ' bpm' : (a.features?.['Heart Rate'] ? Math.round(a.features['Heart Rate']) + ' bpm' : '—');
+                            const pred  = a.prediction || '—';
+                            const isNorm = pred.toLowerCase().includes('normal');
+                            const predColor = isNorm ? '#26de81' : (rl === 'High' ? '#ff4757' : '#ffa500');
+
+                            const tr = document.createElement('tr');
+                            tr.title = 'Click to load this analysis into results panel';
+                            tr.innerHTML = `
+                                <td style="color:#6b7db3;font-family:monospace;font-size:.7rem;">${analyses.length - i}</td>
+                                <td style="font-size:.75rem;color:#b8c4e0;font-family:'JetBrains Mono',monospace;">${dateStr}</td>
+                                <td style="font-weight:700;color:${predColor};">${pred}</td>
+                                <td style="font-family:monospace;">${conf}</td>
+                                <td><span style="font-size:.68rem;font-weight:800;padding:.18rem .55rem;border-radius:999px;background:${rColor}22;color:${rColor};border:1px solid ${rColor}66;">${rl}</span></td>
+                                <td style="font-family:monospace;">${hr}</td>`;
+
+                            // Clicking a row restores it into the results panel
+                            tr.addEventListener('click', () => {
+                                if (typeof displayResults === 'function' && a.prediction) {
+                                    const synth = {
+                                        prediction: a.prediction, confidence: parseFloat(a.confidence||0),
+                                        uncertainty: parseFloat(a.uncertainty||0),
+                                        risk_level: a.risk_level || 'Low',
+                                        probabilities: a.probabilities || {},
+                                        features: a.features || {},
+                                        recommendations: a.recommendations || [],
+                                        gradcam_heatmap: null, shap_values: null,
+                                    };
+                                    displayResults(synth);
+                                    if (typeof updateLiveStats === 'function') updateLiveStats(synth);
+                                    if (typeof showSection === 'function') {
+                                        showSection(document.getElementById('resultsSection'));
+                                        showSection(document.getElementById('featuresSection'));
+                                    }
+                                    if (typeof showNotification === 'function') showNotification('Loaded analysis from ' + dateStr, 'info');
+                                }
+                            });
+                            tbody.appendChild(tr);
+                        });
+
+                    } catch(err) {
+                        wrap.innerHTML = '<div style="color:#ff4757;font-size:.8rem;padding:1rem;">Error: ' + err.message + '</div>';
+                    }
+                }
+
+                // Listen to patient selector changes
+                if (patientSel) {
+                    patientSel.addEventListener('change', e => {
+                        const pid = e.target.value;
+                        if (pid) loadTrackerHistory(pid);
+                        else {
+                            $('trackerTableWrap').innerHTML = `
+                                <div class="tracker-no-patient">
+                                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="7" r="4"/><path d="M2 21v-2a7 7 0 0 1 14 0v2"/></svg>
+                                    <span>Select a patient from the selector above to view their ECG session history.</span>
+                                </div>`;
+                            if ($('trackerSummaryChips')) $('trackerSummaryChips').style.display = 'none';
+                            if ($('trackerPatientBadge')) $('trackerPatientBadge').style.display = 'none';
+                        }
+                    });
+                }
+
+                // Live tracking tab buttons
+                let trackerInterval = null;
+                $('trackerStartLiveBtn')?.addEventListener('click', () => {
+                    const pid = patientSel?.value;
+                    if (!pid) { if (typeof showNotification === 'function') showNotification('⚠️ Please select a patient first', 'warning'); return; }
+                    if (!window.currentECGData?.length) { if (typeof showNotification === 'function') showNotification('⚠️ Generate or upload ECG data first', 'warning'); return; }
+                    if (!window.socket) { if (typeof initializeSocket === 'function') initializeSocket(); }
+                    window.socket?.emit('start_monitoring', { patient_id: pid });
+                    let idx = 0;
+                    $('trackerStartLiveBtn').disabled = true;
+                    $('trackerStopLiveBtn').disabled = false;
+                    $('trackerLiveStatus').style.display = 'inline-block';
+                    trackerInterval = setInterval(() => {
+                        const chunk = window.currentECGData.slice(idx, idx + 100);
+                        if (chunk.length) { window.socket?.emit('stream_ecg', { ecg_data: chunk, patient_id: pid }); idx += 100; }
+                        else idx = 0;
+                    }, 500);
+                    if (typeof showNotification === 'function') showNotification('📡 Live tracking started for ' + pid, 'success');
+                });
+
+                $('trackerStopLiveBtn')?.addEventListener('click', () => {
+                    clearInterval(trackerInterval); trackerInterval = null;
+                    $('trackerStartLiveBtn').disabled = false;
+                    $('trackerStopLiveBtn').disabled = true;
+                    $('trackerLiveStatus').style.display = 'none';
+                    if (typeof showNotification === 'function') showNotification('Live tracking stopped', 'info');
+                });
+
+                // Upload & Analyze tab
+                const trackerUploadBox = $('trackerUploadBox');
+                const trackerFileInput = $('trackerFileInput');
+                const trackerAnalyzeBtn = $('trackerAnalyzeBtn');
+                const trackerUploadInfo = $('trackerUploadInfo');
+                let trackerECGData = null;
+
+                trackerUploadBox?.addEventListener('click', () => trackerFileInput?.click());
+                trackerUploadBox?.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); trackerFileInput?.click(); } });
+                trackerUploadBox?.addEventListener('dragover', e => { e.preventDefault(); trackerUploadBox.style.borderColor = '#00d4ff'; });
+                trackerUploadBox?.addEventListener('dragleave', () => trackerUploadBox.style.borderColor = '');
+                trackerUploadBox?.addEventListener('drop', e => {
+                    e.preventDefault(); trackerUploadBox.style.borderColor = '';
+                    if (e.dataTransfer.files[0]) handleTrackerFile(e.dataTransfer.files[0]);
+                });
+                trackerFileInput?.addEventListener('change', e => { if (e.target.files[0]) handleTrackerFile(e.target.files[0]); });
+
+                function handleTrackerFile(file) {
+                    const reader = new FileReader();
+                    reader.onload = e => {
+                        try {
+                            let data;
+                            if (file.name.endsWith('.json')) {
+                                const json = JSON.parse(e.target.result);
+                                data = json.signal || json.data || json.ecg_signal || json;
+                                if (Array.isArray(data) && data.length && typeof data[0] === 'object') data = data.map(v => v.value ?? v.amplitude ?? v);
+                            } else {
+                                data = e.target.result.split(/[\n,\r]+/).map(v => parseFloat(v.trim())).filter(v => !isNaN(v));
+                            }
+                            if (data?.length >= 100) {
+                                trackerECGData = data;
+                                // Also set as global for reuse
+                                window.currentECGData = data;
+                                if (typeof visualizeECG === 'function') { visualizeECG(data); if (typeof showSection === 'function') showSection(document.getElementById('ecgSection')); }
+                                trackerUploadInfo.textContent = '✓ ' + file.name + ' loaded (' + data.length.toLocaleString() + ' samples)';
+                                trackerUploadInfo.style.display = '';
+                                trackerAnalyzeBtn.style.display = 'inline-block';
+                                if (typeof showNotification === 'function') showNotification('✓ ECG loaded: ' + file.name, 'success');
+                            } else {
+                                if (typeof showNotification === 'function') showNotification('⚠️ File too short or could not parse ECG', 'warning');
+                            }
+                        } catch(err) {
+                            if (typeof showNotification === 'function') showNotification('❌ Error reading file: ' + err.message, 'error');
+                        }
+                    };
+                    reader.readAsText(file);
+                }
+
+                trackerAnalyzeBtn?.addEventListener('click', async () => {
+                    const pid = patientSel?.value;
+                    if (!pid) { if (typeof showNotification === 'function') showNotification('⚠️ Select a patient first', 'warning'); return; }
+                    if (!trackerECGData?.length) { if (typeof showNotification === 'function') showNotification('⚠️ Upload an ECG file first', 'warning'); return; }
+
+                    trackerAnalyzeBtn.disabled = true;
+                    trackerAnalyzeBtn.textContent = 'Analyzing…';
+
+                    try {
+                        const res = await fetch('/api/predict', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ ecg_signal: trackerECGData, patient_id: pid }),
+                        });
+                        const result = await res.json();
+                        if (result.success) {
+                            if (typeof displayResults === 'function') displayResults(result);
+                            if (typeof displayXAI === 'function') displayXAI(result);
+                            if (typeof updateLiveStats === 'function') updateLiveStats(result);
+                            if (typeof showSection === 'function') {
+                                showSection(document.getElementById('resultsSection'));
+                                showSection(document.getElementById('featuresSection'));
+                            }
+                            if (typeof showNotification === 'function') showNotification('✓ Analysis saved for patient ' + pid, 'success');
+                            // Reload records tab
+                            setTimeout(() => loadTrackerHistory(pid), 600);
+                        } else {
+                            if (typeof showNotification === 'function') showNotification('❌ ' + (result.error || 'Analysis failed'), 'error');
+                        }
+                    } catch(err) {
+                        if (typeof showNotification === 'function') showNotification('❌ ' + err.message, 'error');
+                    } finally {
+                        trackerAnalyzeBtn.disabled = false;
+                        trackerAnalyzeBtn.textContent = '⚡ Analyze for Selected Patient';
+                    }
+                });
+
+                // Expose loader so app_advanced.js can call it after patient change
+                window.loadTrackerHistory = loadTrackerHistory;
+            })();
+        })();
+    </script>
+
+
+    <!-- ===== LEGAL MODALS ===== -->
+    <style>
+        .legal-modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 15, 30, 0.85);
+            backdrop-filter: blur(12px);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .legal-modal-content {
+            background: #111827;
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            border-radius: 16px;
+            width: 90%;
+            max-width: 620px;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+            padding: 2.5rem;
+            color: #f0f4ff;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.6);
+            animation: modalSlideIn 0.25s ease;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                transform: translateY(24px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .legal-modal-close {
+            position: absolute;
+            top: 1.2rem;
+            right: 1.2rem;
+            background: rgba(255, 255, 255, 0.06);
+            border: none;
+            color: #a0c4e8;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+
+        .legal-modal-close:hover {
+            background: rgba(255, 71, 87, .25);
+            color: #ff4757;
+        }
+
+        .legal-modal-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin-bottom: 1.2rem;
+            color: #00d4ff;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+            padding-bottom: 0.8rem;
+        }
+
+        .legal-modal-body {
+            font-size: 0.88rem;
+            line-height: 1.7;
+            color: #b8c4e0;
+        }
+
+        .legal-modal-body h3 {
+            font-size: 1rem;
+            color: #f0f4ff;
+            margin: 1.3rem 0 0.4rem;
+        }
+
+        .legal-modal-body p {
+            margin-bottom: 0.9rem;
+        }
+    </style>
+
+    <div id="privacyModal" class="legal-modal-overlay">
+        <div class="legal-modal-content">
+            <button class="legal-modal-close" onclick="hideLegalModal('privacyModal')">&times;</button>
+            <h2 class="legal-modal-title">Privacy Policy</h2>
+            <div class="legal-modal-body">
+                <p><em>Last Updated: March 2026</em></p>
+                <p>Cardiac Monitor Pro is committed to protecting the privacy of your health information. This policy
+                    explains how we handle data on our platform.</p>
+                <h3>Data Collection</h3>
+                <p>We collect biometric data including ECG readings, heart rate, and SpO2 levels, solely for analysis by
+                    our ML models. We also store user credentials and system settings.</p>
+                <h3>Data Security</h3>
+                <p>All data is transmitted via secure WebSocket connections and stored in encrypted databases. We use
+                    industry-standard security measures to prevent unauthorized access.</p>
+                <h3>Data Usage</h3>
+                <p>Your data is used exclusively to provide monitoring and analysis services. We do not sell or share
+                    your health information with third parties for marketing purposes.</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="termsModal" class="legal-modal-overlay">
+        <div class="legal-modal-content">
+            <button class="legal-modal-close" onclick="hideLegalModal('termsModal')">&times;</button>
+            <h2 class="legal-modal-title">Terms of Service</h2>
+            <div class="legal-modal-body">
+                <p><em>Last Updated: March 2026</em></p>
+                <p>By accessing or using Cardiac Monitor Pro, you agree to be bound by these Terms of Service.</p>
+                <h3>Acceptable Use</h3>
+                <p>You agree to use the platform solely for its intended purpose. You must not disrupt the service,
+                    reverse-engineer its algorithms, or upload malicious data.</p>
+                <h3>Account Responsibility</h3>
+                <p>You are responsible for maintaining the confidentiality of your account credentials and all
+                    activities under your account.</p>
+                <h3>Limitation of Liability</h3>
+                <p>Cardiac Monitor Pro is provided as-is without warranty. We are not liable for any direct or indirect
+                    damages resulting from its use.</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="disclaimerModal" class="legal-modal-overlay">
+        <div class="legal-modal-content">
+            <button class="legal-modal-close" onclick="hideLegalModal('disclaimerModal')">&times;</button>
+            <h2 class="legal-modal-title" style="color:#ff4757;">Clinical Disclaimer</h2>
+            <div class="legal-modal-body">
+                <p><strong>IMPORTANT: NOT FOR CLINICAL DIAGNOSIS</strong></p>
+                <p>Cardiac Monitor Pro is designed strictly for <strong>research, educational, and demonstrative
+                        purposes only</strong>.</p>
+                <h3>No Medical Advice</h3>
+                <p>Detections, risk scores, AI responses, and reports from this system do not constitute professional
+                    medical advice, diagnosis, or treatment.</p>
+                <h3>Algorithm Limitations</h3>
+                <p>While we use state-of-the-art Deep Learning models, AI can produce false positives or negatives.
+                    Always consult a qualified physician for any medical concern.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openLegalModal(modalId, event) {
+            if (event) event.preventDefault();
+            var modal = document.getElementById(modalId);
+            if (modal) modal.style.display = 'flex';
+        }
+        function hideLegalModal(modalId) {
+            var modal = document.getElementById(modalId);
+            if (modal) modal.style.display = 'none';
+        }
+        ['privacyModal', 'termsModal', 'disclaimerModal'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) el.addEventListener('click', function (e) {
+                if (e.target === el) hideLegalModal(id);
+            });
+        });
+    </script>
+</body>
+
+</html>
